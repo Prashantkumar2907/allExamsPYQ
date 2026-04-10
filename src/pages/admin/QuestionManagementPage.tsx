@@ -239,10 +239,10 @@ export default function QuestionManagementPage() {
                   </div>
                 </div>
                 <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                  <button onClick={() => openEdit(q)} className="h-6 w-6 flex items-center justify-center rounded text-[var(--fg-muted)] hover:text-[var(--primary)]">
+                  <button onClick={() => openEdit(q)} className="h-6 w-6 flex items-center justify-center rounded text-[var(--fg-muted)] hover:text-[var(--primary)] cursor-pointer">
                     <Pencil className="h-3 w-3" />
                   </button>
-                  <button onClick={() => deleteQuestion(q.id)} className="h-6 w-6 flex items-center justify-center rounded text-[var(--fg-muted)] hover:text-red-400">
+                  <button onClick={() => deleteQuestion(q.id)} className="h-6 w-6 flex items-center justify-center rounded text-[var(--fg-muted)] hover:text-red-400 cursor-pointer">
                     <Trash2 className="h-3 w-3" />
                   </button>
                 </div>

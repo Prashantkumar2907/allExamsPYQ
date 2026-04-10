@@ -49,7 +49,7 @@ export default function TestTakingPage() {
       .single();
 
     if (!att || att.status === 'completed') {
-      navigate(`/test-result/${attemptId}`);
+      navigate(`/result/${attemptId}`);
       return;
     }
 
@@ -188,7 +188,7 @@ export default function TestTakingPage() {
       }
     }
 
-    navigate(`/test-result/${attemptId}`);
+    navigate(`/result/${attemptId}`);
   }
 
   if (loading) return <LoadingSpinner />;

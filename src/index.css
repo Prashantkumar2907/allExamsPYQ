@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Enable class-based dark mode (required for .dark toggle to work with dark: variants) */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-primary-50: #e8f7fc;
   --color-primary-100: #c8ecf7;
@@ -227,6 +230,56 @@ body {
 /* Recharts custom tooltip */
 .recharts-tooltip-wrapper {
   outline: none !important;
+}
+
+/* Toast animations */
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(-8px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes toastOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-8px) scale(0.96); }
+}
+.animate-toast-in {
+  animation: toastIn 250ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animate-toast-out {
+  animation: toastOut 200ms ease-in both;
+}
+
+/* Smooth page transitions */
+@keyframes pageSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-page-in {
+  animation: pageSlideIn 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Ensure portal content inherits theme */
+[data-radix-popper-content-wrapper] {
+  --bg-surface: var(--bg-surface) !important;
+  --fg: var(--fg) !important;
+}
+
+/* Native form elements — dark mode compatibility */
+select, option {
+  background-color: var(--bg-surface);
+  color: var(--fg);
+}
+select {
+  border-color: var(--border);
+}
+select:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-ring);
+  border-color: var(--primary);
+}
+
+/* Native checkbox theming */
+input[type="checkbox"] {
+  accent-color: var(--primary);
 }
 
 /* Reduced motion */

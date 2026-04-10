@@ -178,13 +178,13 @@ export default function ExamManagementPage() {
             <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
                 onClick={(e) => { e.stopPropagation(); openEdit(level, item); }}
-                className="h-5 w-5 flex items-center justify-center rounded text-[var(--fg-muted)] hover:text-[var(--primary)]"
+                className="h-5 w-5 flex items-center justify-center rounded text-[var(--fg-muted)] hover:text-[var(--primary)] cursor-pointer"
               >
                 <Pencil className="h-2.5 w-2.5" />
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); handleDelete(level, item.id); }}
-                className="h-5 w-5 flex items-center justify-center rounded text-[var(--fg-muted)] hover:text-red-400"
+                className="h-5 w-5 flex items-center justify-center rounded text-[var(--fg-muted)] hover:text-red-400 cursor-pointer"
               >
                 <Trash2 className="h-2.5 w-2.5" />
               </button>
@@ -201,13 +201,13 @@ export default function ExamManagementPage() {
 
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-xs bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg px-3 py-2 flex-wrap">
-        <button onClick={() => { setSelectedExam(null); setSelectedSubject(null); setSelectedChapter(null); }} className="font-medium hover:text-[var(--primary)] transition-colors text-[var(--fg-muted)]">
+        <button onClick={() => { setSelectedExam(null); setSelectedSubject(null); setSelectedChapter(null); }} className="font-medium hover:text-[var(--primary)] transition-colors text-[var(--fg-muted)] cursor-pointer">
           All Exams
         </button>
         {selectedExam && (
           <>
             <ChevronRight className="h-3 w-3 text-[var(--fg-muted)]" />
-            <button onClick={() => { setSelectedSubject(null); setSelectedChapter(null); }} className="font-medium hover:text-[var(--primary)] transition-colors text-[var(--fg)]">
+            <button onClick={() => { setSelectedSubject(null); setSelectedChapter(null); }} className="font-medium hover:text-[var(--primary)] transition-colors text-[var(--fg)] cursor-pointer">
               {selectedExam.name}
             </button>
           </>

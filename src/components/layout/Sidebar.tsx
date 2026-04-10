@@ -76,7 +76,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         </div>
         <button
           onClick={onClose}
-          className="lg:hidden h-8 w-8 flex items-center justify-center rounded-lg text-[var(--fg-muted)] hover:bg-[var(--bg-surface-hover)] transition-colors"
+          className="lg:hidden h-8 w-8 flex items-center justify-center rounded-lg text-[var(--fg-muted)] hover:bg-[var(--bg-surface-hover)] transition-colors cursor-pointer"
         >
           <X className="h-4 w-4" />
         </button>
@@ -94,7 +94,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               to={item.to}
               onClick={onClose}
               className={cn(
-                'relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-150',
+                'relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-150 cursor-pointer',
                 isActive
                   ? 'bg-[var(--primary)]/10 text-[var(--primary)]'
                   : 'text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-surface-hover)]'
@@ -103,7 +103,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               {isActive && (
                 <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-[var(--primary)] animate-scale-in" />
               )}
-              <item.icon className="h-[18px] w-[18px] flex-shrink-0" />
+              <item.icon className={cn('h-[18px] w-[18px] flex-shrink-0 transition-colors', isActive && 'text-[var(--primary)]')} />
               {item.label}
             </NavLink>
           );
@@ -124,7 +124,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         <button
           onClick={async () => { setSigningOut(true); await signOut(); }}
           disabled={signingOut}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors disabled:opacity-60"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors disabled:opacity-60 cursor-pointer"
         >
           {signingOut ? <Loader2 className="h-[18px] w-[18px] animate-spin flex-shrink-0" /> : <LogOut className="h-[18px] w-[18px] flex-shrink-0" />}
           {signingOut ? 'Signing out...' : 'Sign Out'}

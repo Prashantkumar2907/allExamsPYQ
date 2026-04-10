@@ -162,10 +162,10 @@ export default function TestManagementPage() {
                   <p className="text-[10px] text-[var(--fg-muted)]">{t.exam?.name || 'No exam'}</p>
                 </div>
                 <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                  <button onClick={() => openEdit(t)} className="h-6 w-6 flex items-center justify-center rounded text-[var(--fg-muted)] hover:text-[var(--primary)]">
+                  <button onClick={() => openEdit(t)} className="h-6 w-6 flex items-center justify-center rounded text-[var(--fg-muted)] hover:text-[var(--primary)] cursor-pointer">
                     <Pencil className="h-3 w-3" />
                   </button>
-                  <button onClick={() => deleteTest(t.id)} className="h-6 w-6 flex items-center justify-center rounded text-[var(--fg-muted)] hover:text-red-400">
+                  <button onClick={() => deleteTest(t.id)} className="h-6 w-6 flex items-center justify-center rounded text-[var(--fg-muted)] hover:text-red-400 cursor-pointer">
                     <Trash2 className="h-3 w-3" />
                   </button>
                 </div>
@@ -230,16 +230,16 @@ export default function TestManagementPage() {
           </div>
 
           <div className="flex gap-4">
-            <label className="flex items-center gap-1.5 text-xs text-[var(--fg)]">
-              <input type="checkbox" checked={form.is_global} onChange={(e) => setForm({ ...form, is_global: e.target.checked })} className="rounded border-[var(--border)]" />
+            <label className="flex items-center gap-1.5 text-xs text-[var(--fg)] cursor-pointer">
+              <input type="checkbox" checked={form.is_global} onChange={(e) => setForm({ ...form, is_global: e.target.checked })} className="rounded border-[var(--border)] cursor-pointer" />
               Global test
             </label>
-            <label className="flex items-center gap-1.5 text-xs text-[var(--fg)]">
-              <input type="checkbox" checked={form.shuffle_questions} onChange={(e) => setForm({ ...form, shuffle_questions: e.target.checked })} className="rounded border-[var(--border)]" />
+            <label className="flex items-center gap-1.5 text-xs text-[var(--fg)] cursor-pointer">
+              <input type="checkbox" checked={form.shuffle_questions} onChange={(e) => setForm({ ...form, shuffle_questions: e.target.checked })} className="rounded border-[var(--border)] cursor-pointer" />
               Shuffle
             </label>
-            <label className="flex items-center gap-1.5 text-xs text-[var(--fg)]">
-              <input type="checkbox" checked={form.allow_multiple_attempts} onChange={(e) => setForm({ ...form, allow_multiple_attempts: e.target.checked })} className="rounded border-[var(--border)]" />
+            <label className="flex items-center gap-1.5 text-xs text-[var(--fg)] cursor-pointer">
+              <input type="checkbox" checked={form.allow_multiple_attempts} onChange={(e) => setForm({ ...form, allow_multiple_attempts: e.target.checked })} className="rounded border-[var(--border)] cursor-pointer" />
               Multiple attempts
             </label>
           </div>

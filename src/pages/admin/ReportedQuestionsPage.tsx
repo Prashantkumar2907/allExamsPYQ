@@ -95,7 +95,7 @@ export default function ReportedQuestionsPage() {
               className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-[10px] text-[var(--fg)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]/40"
             />
             <div className="flex gap-2">
-              <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => updateStatus(r.id, 'resolved')}>
+              <Button size="sm" className="bg-[var(--success)] hover:bg-[var(--success)]/90 text-white" onClick={() => updateStatus(r.id, 'resolved')}>
                 <CheckCircle className="h-3 w-3 mr-1" /> Resolve
               </Button>
               <Button size="sm" variant="secondary" className="hover:bg-red-500/10 hover:text-red-500" onClick={() => updateStatus(r.id, 'dismissed')}>

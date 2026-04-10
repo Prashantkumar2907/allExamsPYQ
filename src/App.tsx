@@ -3,8 +3,10 @@ import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom
 import { useAuthStore } from './stores/authStore';
 import { AppLayout } from './components/layout/AppLayout';
 import { LoadingSpinner } from './components/shared/LoadingSpinner';
+import { ToastContainer } from './components/ui/Toast';
 
 // Auth pages
+const LandingPage = lazy(() => import('./pages/LandingPage'));
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
 
@@ -64,10 +66,12 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <ToastContainer />
       <Suspense fallback={<LoadingSpinner />}>
         <Routes>
           {/* Guest routes */}
           <Route element={<GuestGuard />}>
+            <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
           </Route>
@@ -103,7 +107,7 @@ export default function App() {
           </Route>
 
           {/* Catch all */}
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
     </BrowserRouter>

@@ -133,7 +133,7 @@ export default function ExamBrowserPage() {
           time_spent_seconds: 0,
         }))
       );
-      navigate(`/test-taking/${attempt.id}`);
+      navigate(`/test/${attempt.id}`);
     }
   }
 

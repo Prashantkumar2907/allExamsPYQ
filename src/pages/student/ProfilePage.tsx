@@ -236,7 +236,7 @@ export default function ProfilePage() {
           </div>
           <div>
             <label className="flex items-center gap-1.5 text-xs font-medium text-[var(--fg-muted)] mb-1.5 uppercase tracking-wider"><BookOpen className="h-3 w-3" /> Target Exam</label>
-            <select value={examId} onChange={(e) => setExamId(e.target.value)} className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2 text-sm text-[var(--fg)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40 transition-colors hover:border-[var(--border-strong)]">
+            <select value={examId} onChange={(e) => setExamId(e.target.value)} className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2 text-sm text-[var(--fg)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40 transition-colors hover:border-[var(--border-strong)] cursor-pointer">
               <option value="">Select exam</option>
               {exams.map((ex) => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
             </select>

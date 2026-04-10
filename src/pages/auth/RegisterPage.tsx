@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
+import { useThemeStore } from '../../stores/themeStore';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
-import { GraduationCap, User, Mail, Lock, Eye, EyeOff, BookOpen } from 'lucide-react';
+import { GraduationCap, User, Mail, Lock, Eye, EyeOff, BookOpen, Sun, Moon, ArrowLeft } from 'lucide-react';
 import { APP_NAME } from '../../lib/constants';
 import type { Exam } from '../../types/database';
 
@@ -18,6 +19,8 @@ export default function RegisterPage() {
   const [exams, setExams] = useState<Exam[]>([]);
   const [error, setError] = useState('');
   const { signUp, loading } = useAuthStore();
+  const { toggleTheme, resolvedTheme } = useThemeStore();
+  const isDark = resolvedTheme() === 'dark';
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -52,6 +55,16 @@ export default function RegisterPage() {
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,var(--primary)/8,transparent_60%)]" />
       <div className="absolute top-0 right-0 w-96 h-96 bg-[var(--primary)]/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
       <div className="absolute bottom-0 left-0 w-72 h-72 bg-[var(--primary)]/5 rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl" />
+
+      {/* Top bar */}
+      <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
+        <Link to="/" className="flex items-center gap-1.5 text-sm text-[var(--fg-muted)] hover:text-[var(--fg)] transition-colors">
+          <ArrowLeft className="h-4 w-4" /> Back
+        </Link>
+        <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme">
+          {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </Button>
+      </div>
 
       <div className="w-full max-w-md animate-fade-in relative">
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-6 shadow-lg">
@@ -108,7 +121,7 @@ export default function RegisterPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2.5 top-[30px] h-7 w-7 flex items-center justify-center rounded-md text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-surface-hover)] transition-colors"
+                  className="absolute right-2.5 top-[30px] h-7 w-7 flex items-center justify-center rounded-md text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-surface-hover)] transition-colors cursor-pointer"
                   tabIndex={-1}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
@@ -158,9 +171,9 @@ export default function RegisterPage() {
             </div>
 
             {error && (
-              <p className="text-xs text-[var(--danger)] bg-[var(--danger)]/10 px-3 py-2 rounded-lg">
+              <div className="text-xs text-[var(--danger)] bg-[var(--danger)]/10 px-3 py-2 rounded-lg animate-fade-in">
                 {error}
-              </p>
+              </div>
             )}
 
             <Button type="submit" className="w-full" size="lg" loading={loading}>
