@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="allExamsPYQ">
+  <rect width="512" height="512" rx="112" fill="#34B6B3"/>
+  <rect x="96" y="128" width="320" height="256" rx="36" fill="#FFFFFF" opacity="0.96"/>
+  <path d="M144 178h224M144 230h224M144 282h148" stroke="#1A2F3C" stroke-width="28" stroke-linecap="round"/>
+  <circle cx="348" cy="304" r="42" fill="#34B6B3"/>
+  <path d="m329 304 13 13 29-34" fill="none" stroke="#FFFFFF" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

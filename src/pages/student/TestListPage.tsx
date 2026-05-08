@@ -8,9 +8,10 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Tabs } from '../../components/ui/Tabs';
 import { EmptyState } from '../../components/shared/EmptyState';
+import { Pagination } from '../../components/ui/Pagination';
 import { cn, getScorePercentage, getAccuracy, formatDate, formatTime } from '../../lib/utils';
 import {
-  ClipboardList, Clock, Award, Play, CheckCircle, ChevronLeft, ChevronRight, History, Target, XCircle, BarChart3,
+  ClipboardList, Clock, Award, Play, CheckCircle, ChevronRight, History, Target, XCircle, BarChart3,
 } from 'lucide-react';
 import type { Test, TestAttempt } from '../../types/database';
 
@@ -153,8 +154,6 @@ export default function TestListPage() {
     </div>
   );
 
-  const totalPages = Math.ceil(historyTotal / HISTORY_PER_PAGE);
-
   function getAvailability(test: Test) {
     const now = Date.now();
     const opensAt = test.scheduled_at ? new Date(test.scheduled_at).getTime() : null;
@@ -274,30 +273,13 @@ export default function TestListPage() {
               })}
             </div>
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 mt-3">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={historyPage === 0}
-                  onClick={() => loadHistory(historyPage - 1)}
-                >
-                  <ChevronLeft className="h-3.5 w-3.5" />
-                </Button>
-                <span className="text-xs text-[var(--fg-muted)]">
-                  {historyPage + 1} / {totalPages}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={historyPage >= totalPages - 1}
-                  onClick={() => loadHistory(historyPage + 1)}
-                >
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            )}
+            <Pagination
+              className="mt-3"
+              page={historyPage}
+              pageSize={HISTORY_PER_PAGE}
+              total={historyTotal}
+              onPageChange={loadHistory}
+            />
           </>
         ) : (
           <div className="text-center py-8">

@@ -110,6 +110,7 @@ html, body, #root {
   margin: 0;
   padding: 0;
   overflow: hidden;
+  overscroll-behavior: none;
 }
 
 body {
@@ -120,6 +121,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
   font-size: 14px;
   line-height: 1.5;
+  touch-action: manipulation;
 }
 
 ::selection {
@@ -290,6 +292,14 @@ select:focus {
   outline: none;
   box-shadow: 0 0 0 2px var(--primary-ring);
   border-color: var(--primary);
+}
+
+main,
+aside,
+.overflow-y-auto,
+.overflow-auto,
+[role="dialog"] {
+  overscroll-behavior: contain;
 }
 
 /* Native checkbox theming */

@@ -54,6 +54,19 @@ allExamsPYQ exists to make previous-year-question practice faster, more measurab
 11. Removed dependency audit findings.
    - `npm audit` now reports zero vulnerabilities.
 
+12. Added responsive pagination and scroll containment.
+   - Reusable `src/components/ui/Pagination.tsx`.
+   - Admin question bank now uses counted pages instead of a hard 50-row scroll area.
+   - Student test history uses the same pagination control.
+   - Global overscroll behavior suppresses bounce/glow at scroll boundaries.
+
+13. Added PWA install support.
+   - `public/manifest.webmanifest`
+   - `public/sw.js`
+   - `public/pwa-icon.svg`
+   - `src/components/shared/PWAInstallPrompt.tsx`
+   - iOS users see Add to Home Screen guidance; install-capable browsers get an Install action.
+
 ## Next highest-impact improvements
 
 1. Replace direct Supabase calls in pages with typed service functions.
@@ -84,3 +97,6 @@ allExamsPYQ exists to make previous-year-question practice faster, more measurab
 7. Add database tests for RLS.
    - Verify student/admin permissions against every table.
    - Verify demo seed stays usable after migrations.
+
+8. Add larger seeded pagination fixtures.
+   - Current demo seed is intentionally small; add 25+ sample questions when automated pagination screenshots are introduced.

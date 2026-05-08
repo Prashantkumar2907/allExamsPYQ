@@ -4,6 +4,7 @@ import { useAuthStore } from './stores/authStore';
 import { AppLayout } from './components/layout/AppLayout';
 import { LoadingSpinner } from './components/shared/LoadingSpinner';
 import { ToastContainer } from './components/ui/Toast';
+import { PWAInstallPrompt } from './components/shared/PWAInstallPrompt';
 
 // Auth pages
 const LandingPage = lazy(() => import('./pages/LandingPage'));
@@ -66,6 +67,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <PWAInstallPrompt />
       <ToastContainer />
       <Suspense fallback={<LoadingSpinner />}>
         <Routes>

@@ -10,6 +10,7 @@ allExamsPYQ is a previous-year-question practice platform for exam preparation. 
 - Supabase for hosted auth/database/storage-ready architecture
 - Seeded browser demo backend when Supabase env vars are not present
 - SQLite fixture generator for local data validation
+- PWA manifest, service worker, install prompt, and iOS Add to Home Screen guidance
 
 ## Quick start
 
@@ -73,7 +74,7 @@ src/
   components/
     layout/      App shell, header, sidebar
     shared/      Empty states, stats cards, spinners
-    ui/          Reusable UI atoms and primitives
+    ui/          Reusable UI atoms, pagination, and primitives
   lib/
     demoData.ts       Seeded demo state
     demoSupabase.ts   Supabase-like browser demo adapter
@@ -86,6 +87,10 @@ src/
     admin/       Admin workflows
   stores/        Auth, page title, and theme stores
   types/         Database-facing TypeScript types
+public/
+  manifest.webmanifest
+  pwa-icon.svg
+  sw.js
 supabase/
   migrations/    Postgres schema, RLS, indexes, triggers
   seed.sql       Demo seed data

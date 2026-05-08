@@ -7,9 +7,12 @@ import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { Dialog } from '../../components/ui/Dialog';
 import { EmptyState } from '../../components/shared/EmptyState';
+import { Pagination } from '../../components/ui/Pagination';
 import { cn } from '../../lib/utils';
 import { Plus, Pencil, Trash2, FileText, CheckCircle } from 'lucide-react';
 import type { Exam, Subject, Chapter, Topic, Question, QuestionType, Difficulty } from '../../types/database';
+
+const QUESTIONS_PAGE_SIZE = 10;
 
 interface QuestionWithOptions extends Omit<Question, 'options'> {
   options: { id: string; option_text: string; is_correct: boolean; explanation: string; sort_order: number }[];
@@ -34,6 +37,8 @@ export default function QuestionManagementPage() {
   const [filterSubject, setFilterSubject] = useState('');
   const [filterChapter, setFilterChapter] = useState('');
   const [filterTopic, setFilterTopic] = useState('');
+  const [questionPage, setQuestionPage] = useState(0);
+  const [questionTotal, setQuestionTotal] = useState(0);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editQ, setEditQ] = useState<QuestionWithOptions | null>(null);
@@ -57,7 +62,8 @@ export default function QuestionManagementPage() {
   useEffect(() => { if (filterExam) loadSubjects(); else { setSubjects([]); setFilterSubject(''); } }, [filterExam]);
   useEffect(() => { if (filterSubject) loadChapters(); else { setChapters([]); setFilterChapter(''); } }, [filterSubject]);
   useEffect(() => { if (filterChapter) loadTopics(); else { setTopics([]); setFilterTopic(''); } }, [filterChapter]);
-  useEffect(() => { loadQuestions(); }, [filterTopic]);
+  useEffect(() => { setQuestionPage(0); }, [filterExam, filterSubject, filterChapter, filterTopic]);
+  useEffect(() => { loadQuestions(questionPage); }, [filterTopic, questionPage]);
 
   async function loadExams() {
     const { data } = await supabase.from('exams').select('*').order('name');
@@ -80,11 +86,18 @@ export default function QuestionManagementPage() {
     if (data) setTopics(data);
   }
 
-  async function loadQuestions() {
-    let query = supabase.from('questions').select('*, options(*)').order('created_at', { ascending: false }).limit(50);
+  async function loadQuestions(page = 0) {
+    const from = page * QUESTIONS_PAGE_SIZE;
+    const to = from + QUESTIONS_PAGE_SIZE - 1;
+    let query = supabase
+      .from('questions')
+      .select('*, options(*)', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(from, to);
     if (filterTopic) query = query.eq('topic_id', filterTopic);
-    const { data } = await query;
+    const { data, count } = await query;
     if (data) setQuestions(data as QuestionWithOptions[]);
+    if (count != null) setQuestionTotal(count);
   }
 
   function openCreate() {
@@ -167,14 +180,18 @@ export default function QuestionManagementPage() {
       }
     }
     setDialogOpen(false);
-    loadQuestions();
+    loadQuestions(questionPage);
   }
 
   async function deleteQuestion(id: string) {
     if (!window.confirm('Are you sure you want to delete this question?')) return;
     const { error } = await supabase.from('questions').delete().eq('id', id);
     if (error) { alert(`Delete failed: ${error.message}`); return; }
-    loadQuestions();
+    const nextTotal = Math.max(0, questionTotal - 1);
+    const maxPage = Math.max(0, Math.ceil(nextTotal / QUESTIONS_PAGE_SIZE) - 1);
+    const nextPage = Math.min(questionPage, maxPage);
+    setQuestionPage(nextPage);
+    loadQuestions(nextPage);
   }
 
   if (loading) {
@@ -189,9 +206,12 @@ export default function QuestionManagementPage() {
 
   return (
     <div className="space-y-5 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-[var(--fg)]">Questions</h1>
-        <Button size="sm" onClick={openCreate} disabled={!filterTopic}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-[var(--fg)] sm:text-2xl">Questions</h1>
+          <p className="text-xs text-[var(--fg-muted)] sm:hidden">{questionTotal} questions in the current view</p>
+        </div>
+        <Button size="sm" onClick={openCreate} disabled={!filterTopic} className="w-full sm:w-auto">
           <Plus className="h-3.5 w-3.5 mr-1" /> Add Question
         </Button>
       </div>
@@ -221,34 +241,53 @@ export default function QuestionManagementPage() {
 
       {/* Questions List */}
       <Card>
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-[var(--fg-muted)]">Question Bank</p>
+            <p className="text-[11px] text-[var(--fg-muted)]">{questionTotal} total records</p>
+          </div>
+          <Badge variant="default">Page {questionPage + 1}</Badge>
+        </div>
+
         {questions.length === 0 ? (
-          <EmptyState icon={FileText} title="No questions" description={filterTopic ? 'No questions in this topic yet.' : 'Select a topic to filter questions.'} />
+          <div className="pt-4">
+            <EmptyState icon={FileText} title="No questions" description={filterTopic ? 'No questions in this topic yet.' : 'Select a topic to filter questions.'} />
+          </div>
         ) : (
-          <div className="space-y-2 max-h-[calc(100dvh-18rem)] overflow-y-auto">
-            {questions.map((q) => (
-              <div key={q.id} className="flex items-start justify-between gap-3 p-3 rounded-lg bg-[var(--bg-body)] border border-transparent hover:border-[var(--border)] hover:shadow-sm transition-all group">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-[var(--fg)] line-clamp-2 mb-1">{q.question_text}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge dot variant={q.difficulty === 'easy' ? 'success' : q.difficulty === 'hard' ? 'danger' : 'warning'}>
-                      {q.difficulty}
-                    </Badge>
-                    <span className="text-[10px] text-[var(--fg-muted)]">{q.marks} marks</span>
-                    {q.year && <span className="text-[10px] text-[var(--fg-muted)]">{q.year}</span>}
-                    <span className="text-[10px] text-[var(--fg-muted)]">{q.options?.length || 0} options</span>
+          <>
+            <div className="space-y-2 pt-3">
+              {questions.map((q) => (
+                <div key={q.id} className="group flex flex-col gap-3 rounded-xl border border-transparent bg-[var(--bg-body)] p-3 transition-all hover:border-[var(--border)] hover:bg-[var(--bg-surface-hover)] sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <p className="mb-1 line-clamp-2 text-sm font-medium leading-snug text-[var(--fg)]">{q.question_text}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge dot variant={q.difficulty === 'easy' ? 'success' : q.difficulty === 'hard' ? 'danger' : 'warning'}>
+                        {q.difficulty}
+                      </Badge>
+                      <span className="text-[10px] text-[var(--fg-muted)]">{q.marks} marks</span>
+                      {q.year && <span className="text-[10px] text-[var(--fg-muted)]">{q.year}</span>}
+                      <span className="text-[10px] text-[var(--fg-muted)]">{q.options?.length || 0} options</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-1 sm:flex-shrink-0 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
+                    <button onClick={() => openEdit(q)} className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--fg-muted)] transition-colors hover:bg-[var(--primary)]/10 hover:text-[var(--primary)] cursor-pointer" aria-label="Edit question">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button onClick={() => deleteQuestion(q.id)} className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--fg-muted)] transition-colors hover:bg-red-500/10 hover:text-red-500 cursor-pointer" aria-label="Delete question">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 </div>
-                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                  <button onClick={() => openEdit(q)} className="h-6 w-6 flex items-center justify-center rounded text-[var(--fg-muted)] hover:text-[var(--primary)] cursor-pointer">
-                    <Pencil className="h-3 w-3" />
-                  </button>
-                  <button onClick={() => deleteQuestion(q.id)} className="h-6 w-6 flex items-center justify-center rounded text-[var(--fg-muted)] hover:text-red-400 cursor-pointer">
-                    <Trash2 className="h-3 w-3" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+            <Pagination
+              className="mt-3"
+              page={questionPage}
+              pageSize={QUESTIONS_PAGE_SIZE}
+              total={questionTotal}
+              onPageChange={setQuestionPage}
+            />
+          </>
         )}
       </Card>
 
