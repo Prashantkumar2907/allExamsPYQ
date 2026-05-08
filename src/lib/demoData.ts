@@ -355,6 +355,12 @@ export function createDemoState(): DemoState {
         password: 'Admin@12345',
         profile_id: 'demo-admin',
       },
+      {
+        id: 'provided-admin-user',
+        email: 'admin@example.com',
+        password: 'adminpassword123',
+        profile_id: 'demo-admin',
+      },
     ],
     exams,
     subjects,

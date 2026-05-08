@@ -48,7 +48,7 @@ end $$;
 
 create table if not exists public.exams (
   id uuid primary key default gen_random_uuid(),
-  name text not null unique,
+  name text not null unique check (length(btrim(name)) > 0),
   description text,
   is_active boolean not null default true,
   created_at timestamptz not null default now()
@@ -57,7 +57,7 @@ create table if not exists public.exams (
 create table if not exists public.subjects (
   id uuid primary key default gen_random_uuid(),
   exam_id uuid not null references public.exams(id) on delete cascade,
-  name text not null,
+  name text not null check (length(btrim(name)) > 0),
   description text,
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
@@ -67,7 +67,7 @@ create table if not exists public.subjects (
 create table if not exists public.chapters (
   id uuid primary key default gen_random_uuid(),
   subject_id uuid not null references public.subjects(id) on delete cascade,
-  name text not null,
+  name text not null check (length(btrim(name)) > 0),
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
   unique (subject_id, name)
@@ -76,7 +76,7 @@ create table if not exists public.chapters (
 create table if not exists public.topics (
   id uuid primary key default gen_random_uuid(),
   chapter_id uuid not null references public.chapters(id) on delete cascade,
-  name text not null,
+  name text not null check (length(btrim(name)) > 0),
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
   unique (chapter_id, name)
@@ -85,7 +85,7 @@ create table if not exists public.topics (
 create table if not exists public.questions (
   id uuid primary key default gen_random_uuid(),
   topic_id uuid not null references public.topics(id) on delete restrict,
-  question_text text not null,
+  question_text text not null check (length(btrim(question_text)) > 0),
   question_type public.question_type_enum not null default 'single_choice',
   difficulty public.difficulty_enum not null default 'medium',
   marks integer not null default 4 check (marks >= 0),
@@ -100,7 +100,7 @@ create table if not exists public.questions (
 create table if not exists public.options (
   id uuid primary key default gen_random_uuid(),
   question_id uuid not null references public.questions(id) on delete cascade,
-  option_text text not null,
+  option_text text not null check (length(btrim(option_text)) > 0),
   is_correct boolean not null default false,
   explanation text,
   sort_order integer not null default 0
@@ -108,8 +108,8 @@ create table if not exists public.options (
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
-  full_name text not null,
-  email text not null unique,
+  full_name text not null check (length(btrim(full_name)) > 0),
+  email text not null unique check (position('@' in email) > 1),
   phone text,
   avatar_url text,
   role public.user_role_enum not null default 'student',
@@ -121,7 +121,7 @@ create table if not exists public.profiles (
 
 create table if not exists public.tests (
   id uuid primary key default gen_random_uuid(),
-  title text not null,
+  title text not null check (length(btrim(title)) > 0),
   description text,
   exam_id uuid references public.exams(id) on delete set null,
   is_global boolean not null default false,
@@ -152,7 +152,7 @@ create table if not exists public.test_attempts (
   test_id uuid references public.tests(id) on delete set null,
   source_type public.attempt_source_enum not null,
   source_id uuid not null,
-  source_name text not null,
+  source_name text not null check (length(btrim(source_name)) > 0),
   score integer not null default 0,
   total_marks integer not null default 0,
   total_questions integer not null default 0,
@@ -163,7 +163,15 @@ create table if not exists public.test_attempts (
   duration_minutes integer,
   status public.attempt_status_enum not null default 'in_progress',
   started_at timestamptz not null default now(),
-  completed_at timestamptz
+  completed_at timestamptz,
+  check (score >= 0),
+  check (total_marks >= 0),
+  check (total_questions >= 0),
+  check (correct_answers >= 0),
+  check (wrong_answers >= 0),
+  check (skipped >= 0),
+  check (time_taken_seconds is null or time_taken_seconds >= 0),
+  check (duration_minutes is null or duration_minutes > 0)
 );
 
 create table if not exists public.user_answers (
@@ -172,7 +180,7 @@ create table if not exists public.user_answers (
   question_id uuid not null references public.questions(id) on delete restrict,
   selected_option_id uuid references public.options(id) on delete set null,
   is_correct boolean,
-  time_spent_seconds integer not null default 0,
+  time_spent_seconds integer not null default 0 check (time_spent_seconds >= 0),
   unique (attempt_id, question_id)
 );
 
@@ -194,14 +202,18 @@ create table if not exists public.leaderboard_scores (
   total_correct integer not null default 0,
   total_questions integer not null default 0,
   updated_at timestamptz not null default now(),
-  unique (exam_id, user_id)
+  unique (exam_id, user_id),
+  check (total_score >= 0),
+  check (tests_taken >= 0),
+  check (total_correct >= 0),
+  check (total_questions >= 0)
 );
 
 create table if not exists public.reported_questions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(id) on delete cascade,
   question_id uuid not null references public.questions(id) on delete cascade,
-  reason text not null,
+  reason text not null check (length(btrim(reason)) > 0),
   description text,
   status public.report_status_enum not null default 'pending',
   admin_notes text,
@@ -266,13 +278,12 @@ begin
     new.id,
     coalesce(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)),
     new.email,
-    coalesce((new.raw_user_meta_data->>'role')::public.user_role_enum, 'student'),
+    'student',
     nullif(new.raw_user_meta_data->>'exam_id', '')::uuid
   )
   on conflict (id) do update set
     full_name = excluded.full_name,
     email = excluded.email,
-    role = excluded.role,
     exam_id = excluded.exam_id;
   return new;
 end;
@@ -296,6 +307,55 @@ as $$
   );
 $$;
 
+create or replace function public.record_leaderboard_attempt(
+  p_exam_id uuid,
+  p_user_id uuid,
+  p_score integer,
+  p_correct integer,
+  p_questions integer
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Authentication required';
+  end if;
+
+  if auth.uid() <> p_user_id and not public.is_admin() then
+    raise exception 'Not authorized to update leaderboard for this user';
+  end if;
+
+  insert into public.leaderboard_scores (
+    exam_id,
+    user_id,
+    total_score,
+    tests_taken,
+    total_correct,
+    total_questions
+  )
+  values (
+    p_exam_id,
+    p_user_id,
+    greatest(0, p_score),
+    1,
+    greatest(0, p_correct),
+    greatest(0, p_questions)
+  )
+  on conflict (exam_id, user_id) do update set
+    total_score = public.leaderboard_scores.total_score + excluded.total_score,
+    tests_taken = public.leaderboard_scores.tests_taken + 1,
+    total_correct = public.leaderboard_scores.total_correct + excluded.total_correct,
+    total_questions = public.leaderboard_scores.total_questions + excluded.total_questions,
+    updated_at = now();
+end;
+$$;
+
+revoke all on function public.record_leaderboard_attempt(uuid, uuid, integer, integer, integer) from public;
+grant execute on function public.record_leaderboard_attempt(uuid, uuid, integer, integer, integer) to authenticated;
+
 create index if not exists idx_subjects_exam on public.subjects(exam_id);
 create index if not exists idx_chapters_subject on public.chapters(subject_id);
 create index if not exists idx_topics_chapter on public.topics(chapter_id);
@@ -304,13 +364,19 @@ create index if not exists idx_options_question_sort on public.options(question_
 create index if not exists idx_test_questions_test_sort on public.test_questions(test_id, sort_order);
 create index if not exists idx_test_attempts_user_status on public.test_attempts(user_id, status);
 create index if not exists idx_test_attempts_completed on public.test_attempts(user_id, completed_at desc) where status = 'completed';
+create index if not exists idx_test_attempts_status_completed on public.test_attempts(status, completed_at desc) where status = 'completed';
 create index if not exists idx_user_answers_attempt on public.user_answers(attempt_id);
+create index if not exists idx_user_answers_question on public.user_answers(question_id);
 create index if not exists idx_bookmarks_user_question on public.bookmarks(user_id, question_id);
+create index if not exists idx_bookmarks_user_created on public.bookmarks(user_id, created_at desc);
 create index if not exists idx_leaderboard_exam_score on public.leaderboard_scores(exam_id, total_score desc);
 create index if not exists idx_reported_pending on public.reported_questions(status) where status = 'pending';
+create index if not exists idx_reported_status_created on public.reported_questions(status, created_at desc);
 create index if not exists idx_syllabus_user on public.syllabus_progress(user_id);
 create index if not exists idx_tests_active_exam on public.tests(status, exam_id);
+create index if not exists idx_tests_global_active on public.tests(status, is_global) where is_global = true;
 create index if not exists idx_tests_scheduled on public.tests(scheduled_at) where scheduled_at is not null;
+create index if not exists idx_profiles_role_created on public.profiles(role, created_at desc);
 
 alter table public.exams enable row level security;
 alter table public.subjects enable row level security;
@@ -419,4 +485,3 @@ drop policy if exists "Users manage own syllabus" on public.syllabus_progress;
 create policy "Users manage own syllabus" on public.syllabus_progress for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 drop policy if exists "Admins read syllabus" on public.syllabus_progress;
 create policy "Admins read syllabus" on public.syllabus_progress for select using (public.is_admin());
-

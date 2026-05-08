@@ -459,6 +459,48 @@ export const demoSupabase = {
   from(table: DemoTableName) {
     return new DemoQuery(table);
   },
+  async rpc(functionName: string, params: Record<string, unknown>) {
+    if (functionName !== 'record_leaderboard_attempt') {
+      return { data: null, error: { message: `Unsupported demo RPC: ${functionName}` } };
+    }
+
+    const state = loadState();
+    const examId = String(params.p_exam_id ?? '');
+    const userId = String(params.p_user_id ?? '');
+    const score = Math.max(0, Number(params.p_score ?? 0));
+    const correct = Math.max(0, Number(params.p_correct ?? 0));
+    const questions = Math.max(0, Number(params.p_questions ?? 0));
+
+    if (!examId || !userId) {
+      return { data: null, error: { message: 'Missing leaderboard exam or user id.' } };
+    }
+
+    const existing = state.leaderboard_scores.find(
+      (row) => row.exam_id === examId && row.user_id === userId
+    );
+
+    if (existing) {
+      existing.total_score += score;
+      existing.tests_taken += 1;
+      existing.total_correct += correct;
+      existing.total_questions += questions;
+      existing.updated_at = new Date().toISOString();
+    } else {
+      state.leaderboard_scores.push({
+        id: createId('leaderboard'),
+        exam_id: examId,
+        user_id: userId,
+        total_score: score,
+        tests_taken: 1,
+        total_correct: correct,
+        total_questions: questions,
+        updated_at: new Date().toISOString(),
+      });
+    }
+
+    saveState(state);
+    return { data: null, error: null };
+  },
   auth: {
     async getSession() {
       return { data: { session: readSession() }, error: null };
