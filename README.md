@@ -28,6 +28,7 @@ Demo accounts:
 ```text
 Student: demoaccount@allexamspyq.local / Demo@12345
 Admin:   admin@allexamspyq.local       / Admin@12345
+Alias:   admin@example.com             / adminpassword123
 ```
 
 ## Local data fixture

@@ -12,11 +12,29 @@ npm audit --audit-level=moderate
 
 Results:
 
-- TypeScript and Vite production build passed.
+- TypeScript and Vite production build passed after allowing Vite/esbuild to spawn outside the sandbox.
 - SQLite demo fixture generated at `local/demo.sqlite`.
 - Audit returned zero vulnerabilities.
 - Supabase CLI is installed, but Docker is not installed in this environment, so `npx supabase start` cannot run here.
 - PWA manifest and service worker assets are reachable from the dev server.
+- New shared error/loading primitives compile in production chunks.
+- Demo-mode `record_leaderboard_attempt` RPC shim compiles with the real Supabase client surface.
+
+## 2026-05-08 modernization checks
+
+- Verified `npm run build`.
+- Verified `npm run db:sqlite`.
+- Verified `npm audit --audit-level=moderate`.
+- Did not run local Supabase migrations because Docker is unavailable in this environment.
+- Did not run Playwright/Cypress because this repo does not currently include an E2E test runner.
+
+## 2026-05-08 quality follow-up checks
+
+- Verified `npm run build` after auth guard, confirmation dialog, profile, and practice-start changes.
+- Verified `npm run db:sqlite` regenerated `local/demo.sqlite`.
+- Verified `npm audit --audit-level=moderate` returned zero vulnerabilities.
+- Smoke checked the running Vite dev server at `http://127.0.0.1:3000` and received HTTP 200.
+- Re-scanned source for native `window.alert`, `window.confirm`, `alert(...)`, `console.error`, and remaining `any` usage in app code. Only no-match scans passed after cleanup.
 
 ## Browser walkthrough
 

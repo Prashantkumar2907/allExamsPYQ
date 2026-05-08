@@ -67,6 +67,24 @@ allExamsPYQ exists to make previous-year-question practice faster, more measurab
    - `src/components/shared/PWAInstallPrompt.tsx`
    - iOS users see Add to Home Screen guidance; install-capable browsers get an Install action.
 
+14. Added modernization audit and repo memory docs.
+   - `docs/product-understanding.md`
+   - `docs/.llm-skills/auth-pattern.md`
+   - `docs/.llm-skills/db-access.md`
+   - `docs/.llm-skills/ui-components.md`
+
+15. Hardened auth, database, and test submission flows.
+   - New users are created as students regardless of client metadata.
+   - Profile updates are allowlisted in `authStore`.
+   - Added database checks and indexes for high-volume admin/student queries.
+   - Added `record_leaderboard_attempt` RPC plus demo-mode support for atomic leaderboard increments.
+
+16. Improved UI state completeness and action feedback.
+   - Added shared `ErrorState`.
+   - Added accessible loading status to `LoadingSpinner`.
+   - Added page-load error states to dashboards and test flows.
+   - Added validation, loading, and toast feedback to critical test/question/upload mutations.
+
 ## Next highest-impact improvements
 
 1. Replace direct Supabase calls in pages with typed service functions.
@@ -81,11 +99,11 @@ allExamsPYQ exists to make previous-year-question practice faster, more measurab
 3. Add real multiple-choice and numerical question support.
    - Current UI exposes the enum but behaves like single-choice.
 
-4. Add content QA and import validation.
+4. Expand content QA and import validation.
    - CSV preview before import.
    - Duplicate detection.
-   - Required correct-answer validation.
-   - Row-level error recovery.
+   - Batch progress indicator for large files.
+   - Rich row-level recovery and downloadable error report.
 
 5. Add question media support with Supabase Storage.
    - Images, diagrams, and solution attachments.
