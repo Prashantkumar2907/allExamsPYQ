@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom
 import { useAuthStore } from './stores/authStore';
 import { AppLayout } from './components/layout/AppLayout';
 import { LoadingSpinner } from './components/shared/LoadingSpinner';
+import { ErrorState } from './components/shared/ErrorState';
 import { ToastContainer } from './components/ui/Toast';
 import { PWAInstallPrompt } from './components/shared/PWAInstallPrompt';
 
@@ -40,9 +41,11 @@ function AuthGuard() {
 }
 
 function GuestGuard() {
-  const { user, profile, loading, initialized } = useAuthStore();
+  const { user, profile, profileError, fetchProfile, loading, initialized } = useAuthStore();
   if (!initialized || loading) return <LoadingSpinner />;
   if (user) {
+    if (profileError) return <ErrorState description={profileError} onRetry={() => fetchProfile(user.id)} />;
+    if (!profile) return <LoadingSpinner />;
     const home = profile?.role === 'admin' ? '/admin' : '/dashboard';
     return <Navigate to={home} replace />;
   }
@@ -50,7 +53,9 @@ function GuestGuard() {
 }
 
 function RoleGuard({ role }: { role: 'student' | 'admin' }) {
-  const { profile } = useAuthStore();
+  const { user, profile, profileError, fetchProfile } = useAuthStore();
+  if (profileError) return <ErrorState description={profileError} onRetry={() => user && fetchProfile(user.id)} />;
+  if (!profile) return <LoadingSpinner />;
   if (profile?.role !== role) {
     const redirect = profile?.role === 'admin' ? '/admin' : '/dashboard';
     return <Navigate to={redirect} replace />;

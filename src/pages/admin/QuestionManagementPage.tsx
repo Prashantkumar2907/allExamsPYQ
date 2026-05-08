@@ -6,8 +6,12 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { Dialog } from '../../components/ui/Dialog';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { EmptyState } from '../../components/shared/EmptyState';
+import { ErrorState } from '../../components/shared/ErrorState';
 import { Pagination } from '../../components/ui/Pagination';
+import { toast } from '../../components/ui/Toast';
+import { getErrorMessage, normalizeText } from '../../lib/api';
 import { cn } from '../../lib/utils';
 import { Plus, Pencil, Trash2, FileText, CheckCircle } from 'lucide-react';
 import type { Exam, Subject, Chapter, Topic, Question, QuestionType, Difficulty } from '../../types/database';
@@ -27,6 +31,8 @@ interface OptionForm {
 export default function QuestionManagementPage() {
   const setPage = usePageStore((s) => s.setPage);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
   const [exams, setExams] = useState<Exam[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -42,6 +48,7 @@ export default function QuestionManagementPage() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editQ, setEditQ] = useState<QuestionWithOptions | null>(null);
+  const [deleteQuestionId, setDeleteQuestionId] = useState('');
   const [form, setForm] = useState({
     question_text: '',
     question_type: 'single_choice' as QuestionType,
@@ -66,24 +73,44 @@ export default function QuestionManagementPage() {
   useEffect(() => { loadQuestions(questionPage); }, [filterTopic, questionPage]);
 
   async function loadExams() {
-    const { data } = await supabase.from('exams').select('*').order('name');
-    if (data) setExams(data);
-    setLoading(false);
+    setLoading(true);
+    setError('');
+    try {
+      const { data, error: examsError } = await supabase.from('exams').select('*').order('name');
+      if (examsError) throw examsError;
+      setExams(data || []);
+    } catch (err) {
+      setError(getErrorMessage(err, 'Unable to load exams.'));
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function loadSubjects() {
-    const { data } = await supabase.from('subjects').select('*').eq('exam_id', filterExam).order('sort_order');
-    if (data) setSubjects(data);
+    const { data, error: subjectsError } = await supabase.from('subjects').select('*').eq('exam_id', filterExam).order('sort_order');
+    if (subjectsError) {
+      toast.error(getErrorMessage(subjectsError, 'Unable to load subjects.'));
+      return;
+    }
+    setSubjects(data || []);
   }
 
   async function loadChapters() {
-    const { data } = await supabase.from('chapters').select('*').eq('subject_id', filterSubject).order('sort_order');
-    if (data) setChapters(data);
+    const { data, error: chaptersError } = await supabase.from('chapters').select('*').eq('subject_id', filterSubject).order('sort_order');
+    if (chaptersError) {
+      toast.error(getErrorMessage(chaptersError, 'Unable to load chapters.'));
+      return;
+    }
+    setChapters(data || []);
   }
 
   async function loadTopics() {
-    const { data } = await supabase.from('topics').select('*').eq('chapter_id', filterChapter).order('sort_order');
-    if (data) setTopics(data);
+    const { data, error: topicsError } = await supabase.from('topics').select('*').eq('chapter_id', filterChapter).order('sort_order');
+    if (topicsError) {
+      toast.error(getErrorMessage(topicsError, 'Unable to load topics.'));
+      return;
+    }
+    setTopics(data || []);
   }
 
   async function loadQuestions(page = 0) {
@@ -95,9 +122,13 @@ export default function QuestionManagementPage() {
       .order('created_at', { ascending: false })
       .range(from, to);
     if (filterTopic) query = query.eq('topic_id', filterTopic);
-    const { data, count } = await query;
-    if (data) setQuestions(data as QuestionWithOptions[]);
-    if (count != null) setQuestionTotal(count);
+    const { data, count, error: questionsError } = await query;
+    if (questionsError) {
+      setError(getErrorMessage(questionsError, 'Unable to load questions.'));
+      return;
+    }
+    setQuestions((data || []) as QuestionWithOptions[]);
+    setQuestionTotal(count || 0);
   }
 
   function openCreate() {
@@ -133,65 +164,107 @@ export default function QuestionManagementPage() {
     setDialogOpen(true);
   }
 
+  function validateQuestionForm(topicId: string | undefined) {
+    const validOptions = optionForms.filter((o) => o.option_text.trim());
+    const correctOptions = validOptions.filter((o) => o.is_correct);
+    const year = form.year ? Number(form.year) : null;
+
+    if (!topicId) return 'Choose a topic before saving a question.';
+    if (!form.question_text.trim()) return 'Question text is required.';
+    if (validOptions.length < 2) return 'Add at least two answer options.';
+    if (correctOptions.length !== 1) return 'Choose exactly one correct option.';
+    if (form.marks < 0 || form.negative_marks < 0) return 'Marks cannot be negative.';
+    if (year != null && (!Number.isInteger(year) || year < 1900 || year > 2100)) {
+      return 'Year must be a whole number between 1900 and 2100.';
+    }
+    return null;
+  }
+
   async function handleSave() {
     const topicId = filterTopic || editQ?.topic_id;
-    if (!topicId) return;
+    const validationError = validateQuestionForm(topicId);
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
 
-    if (editQ) {
-      await supabase.from('questions').update({
+    setSaving(true);
+    try {
+      const questionPayload = {
         topic_id: topicId,
-        question_text: form.question_text,
+        question_text: normalizeText(form.question_text),
         question_type: form.question_type,
         difficulty: form.difficulty,
         marks: form.marks,
         negative_marks: form.negative_marks,
         year: form.year ? Number(form.year) : null,
         explanation: form.explanation || null,
-      }).eq('id', editQ.id);
-      await supabase.from('options').delete().eq('question_id', editQ.id);
-      const opts = optionForms.filter((o) => o.option_text.trim()).map((o, i) => ({
-        question_id: editQ.id,
-        option_text: o.option_text,
-        is_correct: o.is_correct,
-        explanation: o.explanation || null,
-        sort_order: i,
-      }));
-      if (opts.length) await supabase.from('options').insert(opts);
-    } else {
-      const { data: newQ } = await supabase.from('questions').insert({
-        topic_id: topicId,
-        question_text: form.question_text,
-        question_type: form.question_type,
-        difficulty: form.difficulty,
-        marks: form.marks,
-        negative_marks: form.negative_marks,
-        year: form.year ? Number(form.year) : null,
-        explanation: form.explanation || null,
-      }).select().single();
-      if (newQ) {
+      };
+
+      if (editQ) {
+        const { error: updateError } = await supabase.from('questions').update(questionPayload).eq('id', editQ.id);
+        if (updateError) throw updateError;
+
+        const { error: deleteOptionsError } = await supabase.from('options').delete().eq('question_id', editQ.id);
+        if (deleteOptionsError) throw deleteOptionsError;
+
         const opts = optionForms.filter((o) => o.option_text.trim()).map((o, i) => ({
-          question_id: newQ.id,
-          option_text: o.option_text,
+          question_id: editQ.id,
+          option_text: normalizeText(o.option_text),
           is_correct: o.is_correct,
           explanation: o.explanation || null,
           sort_order: i,
         }));
-        if (opts.length) await supabase.from('options').insert(opts);
+        if (opts.length) {
+          const { error: optionsError } = await supabase.from('options').insert(opts);
+          if (optionsError) throw optionsError;
+        }
+      } else {
+        const { data: newQ, error: createError } = await supabase.from('questions').insert(questionPayload).select().single();
+        if (createError) throw createError;
+        if (!newQ) throw new Error('Question was not created.');
+
+        const opts = optionForms.filter((o) => o.option_text.trim()).map((o, i) => ({
+          question_id: newQ.id,
+          option_text: normalizeText(o.option_text),
+          is_correct: o.is_correct,
+          explanation: o.explanation || null,
+          sort_order: i,
+        }));
+        if (opts.length) {
+          const { error: optionsError } = await supabase.from('options').insert(opts);
+          if (optionsError) throw optionsError;
+        }
       }
+
+      setDialogOpen(false);
+      toast.success(editQ ? 'Question updated.' : 'Question created.');
+      loadQuestions(questionPage);
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Could not save question.'));
+    } finally {
+      setSaving(false);
     }
-    setDialogOpen(false);
-    loadQuestions(questionPage);
   }
 
-  async function deleteQuestion(id: string) {
-    if (!window.confirm('Are you sure you want to delete this question?')) return;
-    const { error } = await supabase.from('questions').delete().eq('id', id);
-    if (error) { alert(`Delete failed: ${error.message}`); return; }
-    const nextTotal = Math.max(0, questionTotal - 1);
-    const maxPage = Math.max(0, Math.ceil(nextTotal / QUESTIONS_PAGE_SIZE) - 1);
-    const nextPage = Math.min(questionPage, maxPage);
-    setQuestionPage(nextPage);
-    loadQuestions(nextPage);
+  async function deleteQuestion() {
+    if (!deleteQuestionId) return;
+    setSaving(true);
+    try {
+      const { error: deleteError } = await supabase.from('questions').delete().eq('id', deleteQuestionId);
+      if (deleteError) throw deleteError;
+      const nextTotal = Math.max(0, questionTotal - 1);
+      const maxPage = Math.max(0, Math.ceil(nextTotal / QUESTIONS_PAGE_SIZE) - 1);
+      const nextPage = Math.min(questionPage, maxPage);
+      setQuestionPage(nextPage);
+      await loadQuestions(nextPage);
+      setDeleteQuestionId('');
+      toast.success('Question deleted.');
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Delete failed.'));
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (loading) {
@@ -203,6 +276,7 @@ export default function QuestionManagementPage() {
       </div>
     );
   }
+  if (error) return <ErrorState description={error} onRetry={loadExams} />;
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -273,7 +347,7 @@ export default function QuestionManagementPage() {
                     <button onClick={() => openEdit(q)} className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--fg-muted)] transition-colors hover:bg-[var(--primary)]/10 hover:text-[var(--primary)] cursor-pointer" aria-label="Edit question">
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
-                    <button onClick={() => deleteQuestion(q.id)} className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--fg-muted)] transition-colors hover:bg-red-500/10 hover:text-red-500 cursor-pointer" aria-label="Delete question">
+                    <button onClick={() => setDeleteQuestionId(q.id)} className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--fg-muted)] transition-colors hover:bg-red-500/10 hover:text-red-500 cursor-pointer" aria-label="Delete question">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -308,7 +382,7 @@ export default function QuestionManagementPage() {
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="block text-xs font-medium text-[var(--fg)] mb-1">Difficulty</label>
-              <select value={form.difficulty} onChange={(e) => setForm({ ...form, difficulty: e.target.value as any })} className="w-full text-xs rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 text-[var(--fg)] focus:ring-2 focus:ring-[var(--primary)]/40 focus:outline-none">
+              <select value={form.difficulty} onChange={(e) => setForm({ ...form, difficulty: e.target.value as Difficulty })} className="w-full text-xs rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 text-[var(--fg)] focus:ring-2 focus:ring-[var(--primary)]/40 focus:outline-none">
                 <option value="easy">Easy</option>
                 <option value="medium">Medium</option>
                 <option value="hard">Hard</option>
@@ -348,6 +422,7 @@ export default function QuestionManagementPage() {
                       'mt-1.5 h-4 w-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors',
                       opt.is_correct ? 'border-green-500 bg-green-500' : 'border-[var(--border)]'
                     )}
+                    aria-label={`Mark option ${String.fromCharCode(65 + i)} as correct`}
                   >
                     {opt.is_correct && <CheckCircle className="h-2.5 w-2.5 text-white" />}
                   </button>
@@ -380,12 +455,21 @@ export default function QuestionManagementPage() {
 
           <div className="flex justify-end gap-2">
             <Button variant="secondary" size="sm" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button size="sm" onClick={handleSave} disabled={!form.question_text.trim()}>
+            <Button size="sm" onClick={handleSave} disabled={!form.question_text.trim()} loading={saving}>
               {editQ ? 'Update' : 'Create'}
             </Button>
           </div>
         </div>
       </Dialog>
+      <ConfirmDialog
+        open={Boolean(deleteQuestionId)}
+        onOpenChange={(open) => !open && setDeleteQuestionId('')}
+        title="Delete question"
+        description="Delete this question and its options? This action cannot be undone."
+        confirmLabel="Delete"
+        onConfirm={deleteQuestion}
+        loading={saving}
+      />
     </div>
   );
 }

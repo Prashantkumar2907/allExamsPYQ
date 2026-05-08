@@ -52,7 +52,10 @@ export function Header({ onMenuClick }: HeaderProps) {
         {(profile || user) && (
           <DropdownMenu.Root>
             <DropdownMenu.Trigger asChild>
-              <button className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--bg-surface-hover)]/60 hover:bg-[var(--bg-surface-hover)] transition-colors cursor-pointer outline-none">
+              <button
+                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[var(--bg-surface-hover)]/60 hover:bg-[var(--bg-surface-hover)] transition-colors cursor-pointer outline-none focus-ring"
+                aria-label="Open account menu"
+              >
                 <Avatar src={profile?.avatar_url} name={profile?.full_name || user?.email || 'User'} size="sm" />
                 <div className="hidden sm:flex flex-col items-start">
                   <span className="text-xs font-medium text-[var(--fg)] max-w-28 truncate leading-tight">

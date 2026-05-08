@@ -77,6 +77,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
         <button
           onClick={onClose}
           className="lg:hidden h-8 w-8 flex items-center justify-center rounded-lg text-[var(--fg-muted)] hover:bg-[var(--bg-surface-hover)] transition-colors cursor-pointer"
+          aria-label="Close menu"
         >
           <X className="h-4 w-4" />
         </button>

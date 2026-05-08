@@ -13,7 +13,12 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
           <div className="text-center space-y-3 max-w-md">
             <p className="text-lg font-semibold text-[var(--danger)]">Something went wrong</p>
             <p className="text-sm text-[var(--fg-muted)]">{this.state.error.message}</p>
-            <button onClick={() => { this.setState({ error: null }); window.location.reload(); }} className="px-4 py-2 text-sm rounded-lg bg-[var(--primary)] text-[var(--primary-fg)]">Reload</button>
+            <button
+              onClick={() => { this.setState({ error: null }); window.location.reload(); }}
+              className="px-4 py-2 text-sm rounded-lg bg-[var(--primary)] text-[var(--primary-fg)] focus-ring"
+            >
+              Reload
+            </button>
           </div>
         </div>
       );

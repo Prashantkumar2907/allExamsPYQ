@@ -20,8 +20,8 @@ export default function LoginPage() {
 
   function fillDemoAccount(role: 'student' | 'admin') {
     if (role === 'admin') {
-      setEmail('admin@allexamspyq.local');
-      setPassword('Admin@12345');
+      setEmail('admin@example.com');
+      setPassword('adminpassword123');
       return;
     }
     setEmail('demoaccount@allexamspyq.local');

@@ -8,7 +8,10 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Tabs } from '../../components/ui/Tabs';
 import { EmptyState } from '../../components/shared/EmptyState';
+import { ErrorState } from '../../components/shared/ErrorState';
 import { Pagination } from '../../components/ui/Pagination';
+import { toast } from '../../components/ui/Toast';
+import { getErrorMessage } from '../../lib/api';
 import { cn, getScorePercentage, getAccuracy, formatDate, formatTime } from '../../lib/utils';
 import {
   ClipboardList, Clock, Award, Play, CheckCircle, ChevronRight, History, Target, XCircle, BarChart3,
@@ -22,122 +25,153 @@ export default function TestListPage() {
   const setPage = usePageStore((s) => s.setPage);
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [examTests, setExamTests] = useState<Test[]>([]);
   const [globalTests, setGlobalTests] = useState<Test[]>([]);
   const [completedTestIds, setCompletedTestIds] = useState<Set<string>>(new Set());
   const [history, setHistory] = useState<TestAttempt[]>([]);
   const [historyPage, setHistoryPage] = useState(0);
   const [historyTotal, setHistoryTotal] = useState(0);
+  const [startingTestId, setStartingTestId] = useState('');
 
   useEffect(() => {
     setPage('Tests', 'Take mock tests and review your history');
   }, [setPage]);
 
   useEffect(() => {
+    if (!profile) return;
     loadTests();
     loadHistory(0);
   }, [profile]);
 
   async function loadTests() {
+    if (!profile) return;
     setLoading(true);
-    const promises: (Promise<unknown> | PromiseLike<unknown>)[] = [];
-
-    if (profile?.exam_id) {
-      promises.push(
+    setError('');
+    try {
+      const [examRes, globalRes] = await Promise.all([
+        profile.exam_id
+          ? supabase
+              .from('tests')
+              .select('*, exam:exams(name)')
+              .eq('exam_id', profile.exam_id)
+              .eq('status', 'active')
+              .order('created_at', { ascending: false })
+          : Promise.resolve({ data: [] as Test[], error: null }),
         supabase
           .from('tests')
           .select('*, exam:exams(name)')
-          .eq('exam_id', profile.exam_id)
+          .eq('is_global', true)
           .eq('status', 'active')
-          .order('created_at', { ascending: false })
-          .then(({ data }) => data && setExamTests(data))
-      );
+          .order('created_at', { ascending: false }),
+      ]);
+
+      if (examRes.error) throw examRes.error;
+      if (globalRes.error) throw globalRes.error;
+
+      setExamTests((examRes.data || []) as Test[]);
+      setGlobalTests((globalRes.data || []) as Test[]);
+    } catch (err) {
+      setError(getErrorMessage(err, 'Unable to load available tests.'));
+    } finally {
+      setLoading(false);
     }
-
-    promises.push(
-      supabase
-        .from('tests')
-        .select('*, exam:exams(name)')
-        .eq('is_global', true)
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-        .then(({ data }) => data && setGlobalTests(data))
-    );
-
-    await Promise.all(promises);
-    setLoading(false);
   }
 
   async function loadHistory(page: number) {
+    if (!profile) return;
     const from = page * HISTORY_PER_PAGE;
     const to = from + HISTORY_PER_PAGE - 1;
-    const { data, count } = await supabase
+    const { data, count, error: historyError } = await supabase
       .from('test_attempts')
       .select('*', { count: 'exact' })
       .eq('user_id', profile!.id)
       .eq('status', 'completed')
       .order('completed_at', { ascending: false })
       .range(from, to);
+    if (historyError) {
+      toast.error(getErrorMessage(historyError, 'Unable to load test history.'));
+      return;
+    }
     if (data) setHistory(data);
     if (count != null) setHistoryTotal(count);
+    if (data) {
+      setCompletedTestIds(new Set(data.map((attempt) => attempt.test_id).filter(Boolean) as string[]));
+    }
     setHistoryPage(page);
   }
 
   async function startTest(test: Test) {
-    const { data: existing } = await supabase
-      .from('test_attempts')
-      .select('id')
-      .eq('user_id', profile!.id)
-      .eq('test_id', test.id)
-      .eq('status', 'completed')
-      .limit(1);
+    if (!profile) return;
+    setStartingTestId(test.id);
+    try {
+      const { data: existing, error: existingError } = await supabase
+        .from('test_attempts')
+        .select('id')
+        .eq('user_id', profile.id)
+        .eq('test_id', test.id)
+        .eq('status', 'completed')
+        .limit(1);
 
-    if (existing && existing.length > 0 && !test.allow_multiple_attempts) {
-      setCompletedTestIds((prev) => new Set(prev).add(test.id));
-      return;
-    }
+      if (existingError) throw existingError;
 
-    const { data: tqs } = await supabase
-      .from('test_questions')
-      .select('question_id')
-      .eq('test_id', test.id)
-      .order('sort_order');
+      if (existing && existing.length > 0 && !test.allow_multiple_attempts) {
+        setCompletedTestIds((prev) => new Set(prev).add(test.id));
+        toast.info('You have already completed this test.');
+        return;
+      }
 
-    const questionIds = tqs?.map((q) => q.question_id) ?? [];
-    if (questionIds.length === 0) {
-      window.alert('This test does not have questions assigned yet.');
-      return;
-    }
+      const { data: tqs, error: questionsError } = await supabase
+        .from('test_questions')
+        .select('question_id')
+        .eq('test_id', test.id)
+        .order('sort_order');
 
-    const attemptQuestionIds = test.shuffle_questions
-      ? [...questionIds].sort(() => Math.random() - 0.5)
-      : questionIds;
+      if (questionsError) throw questionsError;
 
-    const { data: attempt } = await supabase
-      .from('test_attempts')
-      .insert({
-        user_id: profile!.id,
-        test_id: test.id,
-        source_type: 'test' as const,
-        source_id: test.id,
-        source_name: test.title,
-        total_questions: attemptQuestionIds.length,
-        total_marks: test.total_marks,
-        duration_minutes: test.duration_minutes,
-        status: 'in_progress' as const,
-      })
-      .select()
-      .single();
+      const questionIds = tqs?.map((q) => q.question_id) ?? [];
+      if (questionIds.length === 0) {
+        toast.warning('This test does not have questions assigned yet.');
+        return;
+      }
 
-    if (attempt) {
-      await supabase.from('user_answers').insert(
+      const attemptQuestionIds = test.shuffle_questions
+        ? [...questionIds].sort(() => Math.random() - 0.5)
+        : questionIds;
+
+      const { data: attempt, error: attemptError } = await supabase
+        .from('test_attempts')
+        .insert({
+          user_id: profile.id,
+          test_id: test.id,
+          source_type: 'test' as const,
+          source_id: test.id,
+          source_name: test.title,
+          total_questions: attemptQuestionIds.length,
+          total_marks: test.total_marks,
+          duration_minutes: test.duration_minutes,
+          status: 'in_progress' as const,
+        })
+        .select()
+        .single();
+
+      if (attemptError) throw attemptError;
+      if (!attempt) throw new Error('Could not create a test attempt.');
+
+      const { error: answersError } = await supabase.from('user_answers').insert(
         attemptQuestionIds.map((qid) => ({
           attempt_id: attempt.id,
           question_id: qid,
           time_spent_seconds: 0,
         }))
       );
+
+      if (answersError) throw answersError;
       navigate(`/test/${attempt.id}`);
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Unable to start this test.'));
+    } finally {
+      setStartingTestId('');
     }
   }
 
@@ -153,6 +187,7 @@ export default function TestListPage() {
       </div>
     </div>
   );
+  if (error) return <ErrorState description={error} onRetry={loadTests} />;
 
   function getAvailability(test: Test) {
     const now = Date.now();
@@ -185,7 +220,12 @@ export default function TestListPage() {
           {isCompleted ? (
             <Badge variant="success"><CheckCircle className="h-3 w-3 mr-0.5" />Done</Badge>
           ) : (
-            <Button size="sm" onClick={() => startTest(test)} disabled={!availability.available}>
+            <Button
+              size="sm"
+              onClick={() => startTest(test)}
+              disabled={!availability.available}
+              loading={startingTestId === test.id}
+            >
               <Play className="h-3.5 w-3.5" /> {availability.label}
             </Button>
           )}

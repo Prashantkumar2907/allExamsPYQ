@@ -11,6 +11,8 @@ import { Badge } from '../../components/ui/Badge';
 import { Dialog } from '../../components/ui/Dialog';
 import { Sheet } from '../../components/ui/Sheet';
 import { getAvatarUrl, AVATAR_STYLES, type AvatarStyle } from '../../lib/avatarConfig';
+import { toast } from '../../components/ui/Toast';
+import { getErrorMessage } from '../../lib/api';
 import { cn } from '../../lib/utils';
 import {
   Save, CheckCircle, Bookmark, Pencil, Phone, UserRound,
@@ -93,7 +95,7 @@ export default function ProfilePage() {
           .eq('exam_id', profile.exam_id).gt('total_score', lbRes.data.total_score);
         setStats(prev => ({ ...prev, rank: (count || 0) + 1 }));
       }
-    } catch (err) { console.error('Failed to load profile data:', err); }
+    } catch (err) { toast.error(getErrorMessage(err, 'Unable to load profile data.')); }
     finally { setLoading(false); }
   }
 
@@ -110,7 +112,14 @@ export default function ProfilePage() {
     try {
       const avatarUrl = getAvatarUrl(avatarStyle, fullName);
       const { error } = await updateProfile({ full_name: fullName, phone: phone || null, bio: bio || null, avatar_url: avatarUrl, exam_id: examId || null });
-      if (!error) { setSaved(true); setTimeout(() => setSaved(false), 2000); setEditDialogOpen(false); }
+      if (error) {
+        toast.error(error);
+        return;
+      }
+      setSaved(true);
+      toast.success('Profile updated.');
+      setTimeout(() => setSaved(false), 2000);
+      setEditDialogOpen(false);
     } finally { setSaving(false); }
   }
 
@@ -262,7 +271,12 @@ export default function ProfilePage() {
           </div>
           <div className="grid grid-cols-4 gap-3">
             {AVATAR_STYLES.map((style) => (
-              <button key={style} onClick={() => setTempAvatarStyle(style)} className={cn('relative rounded-xl border-2 p-2 transition-all duration-200 cursor-pointer', tempAvatarStyle === style ? 'border-[var(--primary)] bg-[var(--primary)]/5 scale-105 shadow-md' : 'border-transparent hover:border-[var(--border)] hover:bg-[var(--bg-surface-hover)]')}>
+                    <button
+                      key={style}
+                      onClick={() => setTempAvatarStyle(style)}
+                      aria-label={`Use ${style} avatar style`}
+                      className={cn('relative rounded-xl border-2 p-2 transition-all duration-200 cursor-pointer', tempAvatarStyle === style ? 'border-[var(--primary)] bg-[var(--primary)]/5 scale-105 shadow-md' : 'border-transparent hover:border-[var(--border)] hover:bg-[var(--bg-surface-hover)]')}
+                    >
                 <img src={getAvatarUrl(style, profile.full_name)} alt={style} className="h-14 w-14 rounded-lg mx-auto" />
                 {tempAvatarStyle === style && <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[var(--primary)] flex items-center justify-center shadow-sm"><CheckCircle className="h-3 w-3 text-white" /></div>}
                 <p className="text-[9px] text-[var(--fg-muted)] text-center mt-1 truncate">{style}</p>

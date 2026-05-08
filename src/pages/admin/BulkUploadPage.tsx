@@ -5,14 +5,29 @@ import { Card, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { cn } from '../../lib/utils';
+import { getErrorMessage, normalizeText } from '../../lib/api';
+import { toast } from '../../components/ui/Toast';
 import { Upload, FileText, CheckCircle, XCircle, AlertCircle, ChevronDown, Download } from 'lucide-react';
 import Papa from 'papaparse';
+import type { Difficulty, QuestionType } from '../../types/database';
 
 interface UploadResult {
   total: number;
   success: number;
   failed: number;
   errors: string[];
+}
+
+const QUESTION_TYPES = new Set<QuestionType>(['single_choice', 'multiple_choice', 'numerical']);
+const DIFFICULTIES = new Set<Difficulty>(['easy', 'medium', 'hard']);
+const OPTION_KEYS = ['a', 'b', 'c', 'd'];
+
+function isQuestionType(value: string): value is QuestionType {
+  return QUESTION_TYPES.has(value as QuestionType);
+}
+
+function isDifficulty(value: string): value is Difficulty {
+  return DIFFICULTIES.has(value as Difficulty);
 }
 
 export default function BulkUploadPage() {
@@ -39,101 +54,155 @@ export default function BulkUploadPage() {
     setUploading(true);
     setResult(null);
 
-    const text = await file.text();
-    const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
-    const rows = parsed.data as Record<string, string>[];
-
-    const total = rows.length;
-    let success = 0;
-    const errors: string[] = [];
-
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      try {
-        const examName = row.exam?.trim();
-        const subjectName = row.subject?.trim();
-        const chapterName = row.chapter?.trim();
-        const topicName = row.topic?.trim();
-        const questionText = row.question_text?.trim();
-
-        if (!examName || !subjectName || !chapterName || !topicName || !questionText) {
-          errors.push(`Row ${i + 2}: Missing required fields`);
-          continue;
-        }
-
-        // Find or create exam
-        let { data: exam } = await supabase.from('exams').select('id').eq('name', examName).single();
-        if (!exam) {
-          const { data: newExam } = await supabase.from('exams').insert({ name: examName }).select().single();
-          exam = newExam;
-        }
-        if (!exam) { errors.push(`Row ${i + 2}: Failed to find/create exam`); continue; }
-
-        // Find or create subject
-        let { data: subject } = await supabase.from('subjects').select('id').eq('exam_id', exam.id).eq('name', subjectName).single();
-        if (!subject) {
-          const { data: newSub } = await supabase.from('subjects').insert({ exam_id: exam.id, name: subjectName }).select().single();
-          subject = newSub;
-        }
-        if (!subject) { errors.push(`Row ${i + 2}: Failed to find/create subject`); continue; }
-
-        // Find or create chapter
-        let { data: chapter } = await supabase.from('chapters').select('id').eq('subject_id', subject.id).eq('name', chapterName).single();
-        if (!chapter) {
-          const { data: newCh } = await supabase.from('chapters').insert({ subject_id: subject.id, name: chapterName }).select().single();
-          chapter = newCh;
-        }
-        if (!chapter) { errors.push(`Row ${i + 2}: Failed to find/create chapter`); continue; }
-
-        // Find or create topic
-        let { data: topic } = await supabase.from('topics').select('id').eq('chapter_id', chapter.id).eq('name', topicName).single();
-        if (!topic) {
-          const { data: newTp } = await supabase.from('topics').insert({ chapter_id: chapter.id, name: topicName }).select().single();
-          topic = newTp;
-        }
-        if (!topic) { errors.push(`Row ${i + 2}: Failed to find/create topic`); continue; }
-
-        // Create question
-        const { data: question } = await supabase.from('questions').insert({
-          topic_id: topic.id,
-          question_text: questionText,
-          question_type: (row.question_type?.trim() || 'single_choice') as any,
-          difficulty: (row.difficulty?.trim() || 'medium') as any,
-          marks: Number(row.marks) || 1,
-          negative_marks: Number(row.negative_marks) || 0,
-          explanation: row.explanation?.trim() || null,
-          year: row.year?.trim() || null,
-        }).select().single();
-
-        if (!question) { errors.push(`Row ${i + 2}: Failed to create question`); continue; }
-
-        // Create options (option_a, option_b, option_c, option_d)
-        const options = ['a', 'b', 'c', 'd']
-          .map((letter, idx) => ({
-            question_id: question.id,
-            option_text: row[`option_${letter}`]?.trim() || '',
-            is_correct: row.correct_answer?.trim().toLowerCase() === letter,
-            explanation: row[`explanation_${letter}`]?.trim() || null,
-            sort_order: idx,
-          }))
-          .filter((o) => o.option_text);
-
-        if (options.length) await supabase.from('options').insert(options);
-        success++;
-      } catch {
-        errors.push(`Row ${i + 2}: Unexpected error`);
+    try {
+      if (!file.name.toLowerCase().endsWith('.csv')) {
+        toast.error('Upload a CSV file.');
+        return;
       }
-    }
 
-    setResult({ total, success, failed: total - success, errors });
-    setUploading(false);
+      const text = await file.text();
+      const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
+      const rows = parsed.data as Record<string, string>[];
+
+      const parseErrors = parsed.errors.map((err) => `Row ${err.row ?? '?'}: ${err.message}`);
+      const total = rows.length;
+      let success = 0;
+      const errors: string[] = [...parseErrors];
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        try {
+          const examName = normalizeText(row.exam || '');
+          const subjectName = normalizeText(row.subject || '');
+          const chapterName = normalizeText(row.chapter || '');
+          const topicName = normalizeText(row.topic || '');
+          const questionText = row.question_text?.trim();
+          const questionType = row.question_type?.trim() || 'single_choice';
+          const difficulty = row.difficulty?.trim() || 'medium';
+          const correctAnswer = row.correct_answer?.trim().toLowerCase();
+          const yearValue = row.year?.trim() ? Number(row.year) : null;
+          const marks = row.marks?.trim() ? Number(row.marks) : 1;
+          const negativeMarks = row.negative_marks?.trim() ? Number(row.negative_marks) : 0;
+
+          if (!examName || !subjectName || !chapterName || !topicName || !questionText) {
+            errors.push(`Row ${i + 2}: Missing required fields`);
+            continue;
+          }
+          if (!isQuestionType(questionType)) {
+            errors.push(`Row ${i + 2}: Invalid question_type`);
+            continue;
+          }
+          if (!isDifficulty(difficulty)) {
+            errors.push(`Row ${i + 2}: Invalid difficulty`);
+            continue;
+          }
+          if (!Number.isFinite(marks) || marks < 0 || !Number.isFinite(negativeMarks) || negativeMarks < 0) {
+            errors.push(`Row ${i + 2}: Marks must be non-negative numbers`);
+            continue;
+          }
+          if (yearValue != null && (!Number.isInteger(yearValue) || yearValue < 1900 || yearValue > 2100)) {
+            errors.push(`Row ${i + 2}: Year must be between 1900 and 2100`);
+            continue;
+          }
+          if (!correctAnswer || !OPTION_KEYS.includes(correctAnswer)) {
+            errors.push(`Row ${i + 2}: correct_answer must be one of a, b, c, or d`);
+            continue;
+          }
+
+          const optionRows = OPTION_KEYS
+            .map((letter, idx) => ({
+              option_text: row[`option_${letter}`]?.trim() || '',
+              is_correct: correctAnswer === letter,
+              explanation: row[`explanation_${letter}`]?.trim() || null,
+              sort_order: idx,
+            }))
+            .filter((o) => o.option_text);
+
+          if (optionRows.length < 2) {
+            errors.push(`Row ${i + 2}: Add at least two options`);
+            continue;
+          }
+          if (!optionRows.some((option) => option.is_correct)) {
+            errors.push(`Row ${i + 2}: Correct option is blank`);
+            continue;
+          }
+
+          let { data: exam, error: examLookupError } = await supabase.from('exams').select('id').eq('name', examName).single();
+          if (examLookupError && examLookupError.message !== 'No rows returned in demo mode.') {
+            exam = null;
+          }
+          if (!exam) {
+            const { data: newExam, error: examCreateError } = await supabase.from('exams').insert({ name: examName }).select().single();
+            if (examCreateError) throw examCreateError;
+            exam = newExam;
+          }
+          if (!exam) { errors.push(`Row ${i + 2}: Failed to find/create exam`); continue; }
+
+          let { data: subject } = await supabase.from('subjects').select('id').eq('exam_id', exam.id).eq('name', subjectName).single();
+          if (!subject) {
+            const { data: newSub, error: subjectCreateError } = await supabase.from('subjects').insert({ exam_id: exam.id, name: subjectName }).select().single();
+            if (subjectCreateError) throw subjectCreateError;
+            subject = newSub;
+          }
+          if (!subject) { errors.push(`Row ${i + 2}: Failed to find/create subject`); continue; }
+
+          let { data: chapter } = await supabase.from('chapters').select('id').eq('subject_id', subject.id).eq('name', chapterName).single();
+          if (!chapter) {
+            const { data: newCh, error: chapterCreateError } = await supabase.from('chapters').insert({ subject_id: subject.id, name: chapterName }).select().single();
+            if (chapterCreateError) throw chapterCreateError;
+            chapter = newCh;
+          }
+          if (!chapter) { errors.push(`Row ${i + 2}: Failed to find/create chapter`); continue; }
+
+          let { data: topic } = await supabase.from('topics').select('id').eq('chapter_id', chapter.id).eq('name', topicName).single();
+          if (!topic) {
+            const { data: newTp, error: topicCreateError } = await supabase.from('topics').insert({ chapter_id: chapter.id, name: topicName }).select().single();
+            if (topicCreateError) throw topicCreateError;
+            topic = newTp;
+          }
+          if (!topic) { errors.push(`Row ${i + 2}: Failed to find/create topic`); continue; }
+
+          const { data: question, error: questionCreateError } = await supabase.from('questions').insert({
+            topic_id: topic.id,
+            question_text: questionText,
+            question_type: questionType,
+            difficulty: difficulty,
+            marks,
+            negative_marks: negativeMarks,
+            explanation: row.explanation?.trim() || null,
+            year: yearValue,
+          }).select().single();
+
+          if (questionCreateError) throw questionCreateError;
+          if (!question) { errors.push(`Row ${i + 2}: Failed to create question`); continue; }
+
+          const { error: optionsError } = await supabase.from('options').insert(optionRows.map((option) => ({
+            question_id: question.id,
+            ...option,
+          })));
+          if (optionsError) throw optionsError;
+          success++;
+        } catch (err) {
+          errors.push(`Row ${i + 2}: ${getErrorMessage(err, 'Unexpected error')}`);
+        }
+      }
+
+      setResult({ total, success, failed: total - success, errors });
+      if (success > 0) {
+        toast.success(`Imported ${success} question${success === 1 ? '' : 's'}.`);
+      }
+    } catch (err) {
+      setResult({ total: 0, success: 0, failed: 1, errors: [getErrorMessage(err, 'Could not process CSV.')] });
+    } finally {
+      setUploading(false);
+    }
   }, []);
 
   function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     setDragOver(false);
     const file = e.dataTransfer.files[0];
-    if (file && file.name.endsWith('.csv')) processFile(file);
+    if (file) processFile(file);
   }
 
   function handleFileInput(e: React.ChangeEvent<HTMLInputElement>) {

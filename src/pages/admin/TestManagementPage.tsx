@@ -6,10 +6,14 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { Dialog } from '../../components/ui/Dialog';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { EmptyState } from '../../components/shared/EmptyState';
+import { ErrorState } from '../../components/shared/ErrorState';
+import { toast } from '../../components/ui/Toast';
+import { getErrorMessage, normalizeText } from '../../lib/api';
 import { Plus, Pencil, Trash2, ClipboardList, Globe, Calendar, ListPlus, CheckCircle, XCircle } from 'lucide-react';
 import { formatDate } from '../../lib/utils';
-import type { Exam, Subject, Chapter, Topic, Difficulty } from '../../types/database';
+import type { Exam, Subject, Chapter, Topic, Difficulty, TestStatus } from '../../types/database';
 
 interface TestItem {
   id: string;
@@ -47,6 +51,8 @@ interface AssignedQuestionItem {
 export default function TestManagementPage() {
   const setPage = usePageStore((s) => s.setPage);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
   const [tests, setTests] = useState<TestItem[]>([]);
   const [exams, setExams] = useState<Exam[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -56,8 +62,11 @@ export default function TestManagementPage() {
   const [editTest, setEditTest] = useState<TestItem | null>(null);
   const [questionDialogOpen, setQuestionDialogOpen] = useState(false);
   const [questionTest, setQuestionTest] = useState<TestItem | null>(null);
+  const [deleteTestId, setDeleteTestId] = useState('');
+  const [deleting, setDeleting] = useState(false);
   const [assignedQuestions, setAssignedQuestions] = useState<AssignedQuestionItem[]>([]);
   const [availableQuestions, setAvailableQuestions] = useState<QuestionPickerItem[]>([]);
+  const [assigningQuestionId, setAssigningQuestionId] = useState('');
   const [questionExamId, setQuestionExamId] = useState('');
   const [questionSubjectId, setQuestionSubjectId] = useState('');
   const [questionChapterId, setQuestionChapterId] = useState('');
@@ -74,7 +83,7 @@ export default function TestManagementPage() {
     shuffle_questions: false,
     allow_multiple_attempts: false,
     instructions: '',
-    status: 'draft' as 'draft' | 'active' | 'archived',
+    status: 'draft' as TestStatus,
     scheduled_at: '',
     scheduled_end_at: '',
   });
@@ -82,13 +91,22 @@ export default function TestManagementPage() {
   useEffect(() => { setPage('Tests', 'Create and manage tests'); loadData(); }, []);
 
   async function loadData() {
-    const [testsRes, examsRes] = await Promise.all([
-      supabase.from('tests').select('*, exam:exams(name)').order('created_at', { ascending: false }),
-      supabase.from('exams').select('*').order('name'),
-    ]);
-    if (testsRes.data) setTests(testsRes.data as TestItem[]);
-    if (examsRes.data) setExams(examsRes.data);
-    setLoading(false);
+    setLoading(true);
+    setError('');
+    try {
+      const [testsRes, examsRes] = await Promise.all([
+        supabase.from('tests').select('*, exam:exams(name)').order('created_at', { ascending: false }),
+        supabase.from('exams').select('*').order('name'),
+      ]);
+      if (testsRes.error) throw testsRes.error;
+      if (examsRes.error) throw examsRes.error;
+      setTests((testsRes.data || []) as TestItem[]);
+      setExams(examsRes.data || []);
+    } catch (err) {
+      setError(getErrorMessage(err, 'Unable to load tests.'));
+    } finally {
+      setLoading(false);
+    }
   }
 
   function openCreate() {
@@ -114,16 +132,36 @@ export default function TestManagementPage() {
       shuffle_questions: t.shuffle_questions,
       allow_multiple_attempts: t.allow_multiple_attempts,
       instructions: t.instructions || '',
-      status: t.status as 'draft' | 'active' | 'archived',
+      status: t.status,
       scheduled_at: t.scheduled_at ? t.scheduled_at.slice(0, 16) : '',
       scheduled_end_at: t.scheduled_end_at ? t.scheduled_end_at.slice(0, 16) : '',
     });
     setDialogOpen(true);
   }
 
+  function validateForm() {
+    if (!form.title.trim()) return 'Test title is required.';
+    if (!form.is_global && !form.exam_id) return 'Choose an exam or mark the test global.';
+    if (form.duration_minutes <= 0) return 'Duration must be greater than zero.';
+    if (form.total_marks < 0) return 'Total marks cannot be negative.';
+    const startsAt = form.scheduled_at ? new Date(form.scheduled_at).getTime() : null;
+    const endsAt = form.scheduled_end_at ? new Date(form.scheduled_end_at).getTime() : null;
+    if (startsAt != null && Number.isNaN(startsAt)) return 'Scheduled start is invalid.';
+    if (endsAt != null && Number.isNaN(endsAt)) return 'Scheduled end is invalid.';
+    if (startsAt != null && endsAt != null && endsAt <= startsAt) return 'Scheduled end must be after the start.';
+    return null;
+  }
+
   async function handleSave() {
-    const payload: any = {
-      title: form.title,
+    const validationError = validateForm();
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+
+    setSaving(true);
+    const payload: Record<string, string | number | boolean | null> = {
+      title: normalizeText(form.title),
       description: form.description || null,
       exam_id: form.exam_id || null,
       is_global: form.is_global,
@@ -137,20 +175,35 @@ export default function TestManagementPage() {
       scheduled_end_at: form.scheduled_end_at ? new Date(form.scheduled_end_at).toISOString() : null,
     };
 
-    if (editTest) {
-      await supabase.from('tests').update(payload).eq('id', editTest.id);
-    } else {
-      await supabase.from('tests').insert(payload);
+    try {
+      const { error: saveError } = editTest
+        ? await supabase.from('tests').update(payload).eq('id', editTest.id)
+        : await supabase.from('tests').insert(payload);
+      if (saveError) throw saveError;
+      setDialogOpen(false);
+      toast.success(editTest ? 'Test updated.' : 'Test created.');
+      loadData();
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Could not save test.'));
+    } finally {
+      setSaving(false);
     }
-    setDialogOpen(false);
-    loadData();
   }
 
-  async function deleteTest(id: string) {
-    if (!window.confirm('Are you sure you want to delete this test? This action cannot be undone.')) return;
-    const { error } = await supabase.from('tests').delete().eq('id', id);
-    if (error) { alert(`Delete failed: ${error.message}`); return; }
-    loadData();
+  async function deleteTest() {
+    if (!deleteTestId) return;
+    setDeleting(true);
+    try {
+      const { error: deleteError } = await supabase.from('tests').delete().eq('id', deleteTestId);
+      if (deleteError) throw deleteError;
+      await loadData();
+      setDeleteTestId('');
+      toast.success('Test deleted.');
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Delete failed.'));
+    } finally {
+      setDeleting(false);
+    }
   }
 
   async function openQuestionManager(test: TestItem) {
@@ -170,39 +223,59 @@ export default function TestManagementPage() {
   }
 
   async function loadAssignedQuestions(testId: string) {
-    const { data } = await supabase
+    const { data, error: assignedError } = await supabase
       .from('test_questions')
       .select('id, question_id, sort_order, question:questions(id, question_text, difficulty, marks, year)')
       .eq('test_id', testId)
       .order('sort_order');
+    if (assignedError) {
+      toast.error(getErrorMessage(assignedError, 'Unable to load assigned questions.'));
+      return;
+    }
     if (data) setAssignedQuestions(data as unknown as AssignedQuestionItem[]);
   }
 
   async function loadQuestionSubjects(examId: string) {
-    const { data } = await supabase.from('subjects').select('*').eq('exam_id', examId).order('sort_order');
+    const { data, error: subjectsError } = await supabase.from('subjects').select('*').eq('exam_id', examId).order('sort_order');
+    if (subjectsError) {
+      toast.error(getErrorMessage(subjectsError, 'Unable to load subjects.'));
+      return;
+    }
     setSubjects(data || []);
   }
 
   async function loadQuestionChapters(subjectId: string) {
-    const { data } = await supabase.from('chapters').select('*').eq('subject_id', subjectId).order('sort_order');
+    const { data, error: chaptersError } = await supabase.from('chapters').select('*').eq('subject_id', subjectId).order('sort_order');
+    if (chaptersError) {
+      toast.error(getErrorMessage(chaptersError, 'Unable to load chapters.'));
+      return;
+    }
     setChapters(data || []);
   }
 
   async function loadQuestionTopics(chapterId: string) {
-    const { data } = await supabase.from('topics').select('*').eq('chapter_id', chapterId).order('sort_order');
+    const { data, error: topicsError } = await supabase.from('topics').select('*').eq('chapter_id', chapterId).order('sort_order');
+    if (topicsError) {
+      toast.error(getErrorMessage(topicsError, 'Unable to load topics.'));
+      return;
+    }
     setTopics(data || []);
   }
 
   async function loadAvailableQuestions(topicId: string) {
     setQuestionLoading(true);
-    const { data } = await supabase
+    const { data, error: questionsError } = await supabase
       .from('questions')
       .select('id, question_text, difficulty, marks, year')
       .eq('topic_id', topicId)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
       .limit(100);
-    setAvailableQuestions((data || []) as QuestionPickerItem[]);
+    if (questionsError) {
+      toast.error(getErrorMessage(questionsError, 'Unable to load available questions.'));
+    } else {
+      setAvailableQuestions((data || []) as QuestionPickerItem[]);
+    }
     setQuestionLoading(false);
   }
 
@@ -244,12 +317,19 @@ export default function TestManagementPage() {
 
   async function addQuestion(question: QuestionPickerItem) {
     if (!questionTest || assignedQuestions.some((q) => q.question_id === question.id)) return;
+    setAssigningQuestionId(question.id);
     const { error } = await supabase.from('test_questions').insert({
       test_id: questionTest.id,
       question_id: question.id,
       sort_order: assignedQuestions.length + 1,
     });
-    if (!error) await loadAssignedQuestions(questionTest.id);
+    if (error) {
+      toast.error(getErrorMessage(error, 'Could not assign question.'));
+    } else {
+      await loadAssignedQuestions(questionTest.id);
+      toast.success('Question assigned.');
+    }
+    setAssigningQuestionId('');
   }
 
   async function removeQuestion(questionId: string) {
@@ -259,7 +339,12 @@ export default function TestManagementPage() {
       .delete()
       .eq('test_id', questionTest.id)
       .eq('question_id', questionId);
-    if (!error) await loadAssignedQuestions(questionTest.id);
+    if (error) {
+      toast.error(getErrorMessage(error, 'Could not remove question.'));
+    } else {
+      await loadAssignedQuestions(questionTest.id);
+      toast.success('Question removed.');
+    }
   }
 
   if (loading) {
@@ -270,6 +355,7 @@ export default function TestManagementPage() {
       </div>
     );
   }
+  if (error) return <ErrorState description={error} onRetry={loadData} />;
 
   const statusColors = {
     draft: 'muted' as const,
@@ -298,10 +384,10 @@ export default function TestManagementPage() {
                   <p className="text-[10px] text-[var(--fg-muted)]">{t.exam?.name || 'No exam'}</p>
                 </div>
                 <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                  <button onClick={() => openEdit(t)} className="h-6 w-6 flex items-center justify-center rounded text-[var(--fg-muted)] hover:text-[var(--primary)] cursor-pointer">
+                  <button onClick={() => openEdit(t)} className="h-6 w-6 flex items-center justify-center rounded text-[var(--fg-muted)] hover:text-[var(--primary)] cursor-pointer" aria-label="Edit test">
                     <Pencil className="h-3 w-3" />
                   </button>
-                  <button onClick={() => deleteTest(t.id)} className="h-6 w-6 flex items-center justify-center rounded text-[var(--fg-muted)] hover:text-red-400 cursor-pointer">
+                  <button onClick={() => setDeleteTestId(t.id)} className="h-6 w-6 flex items-center justify-center rounded text-[var(--fg-muted)] hover:text-red-400 cursor-pointer" aria-label="Delete test">
                     <Trash2 className="h-3 w-3" />
                   </button>
                 </div>
@@ -351,7 +437,7 @@ export default function TestManagementPage() {
             </div>
             <div>
               <label className="block text-xs font-medium text-[var(--fg)] mb-1">Status</label>
-              <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as any })} className="w-full text-xs rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 text-[var(--fg)] focus:ring-2 focus:ring-[var(--primary)]/40 focus:outline-none">
+              <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as TestStatus })} className="w-full text-xs rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 text-[var(--fg)] focus:ring-2 focus:ring-[var(--primary)]/40 focus:outline-none">
                 <option value="draft">Draft</option>
                 <option value="active">Active</option>
                 <option value="archived">Archived</option>
@@ -387,7 +473,7 @@ export default function TestManagementPage() {
 
           <div className="flex justify-end gap-2">
             <Button variant="secondary" size="sm" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button size="sm" onClick={handleSave} disabled={!form.title.trim()}>
+            <Button size="sm" onClick={handleSave} disabled={!form.title.trim()} loading={saving}>
               {editTest ? 'Update' : 'Create'}
             </Button>
           </div>
@@ -441,7 +527,7 @@ export default function TestManagementPage() {
                           <p className="text-[10px] text-[var(--fg-muted)] mt-1 capitalize">{item.question.difficulty} - {item.question.marks} marks</p>
                         )}
                       </div>
-                      <button onClick={() => removeQuestion(item.question_id)} className="h-7 w-7 flex items-center justify-center rounded-full text-[var(--fg-muted)] hover:text-red-500 hover:bg-red-500/10 transition-colors">
+                      <button onClick={() => removeQuestion(item.question_id)} className="h-7 w-7 flex items-center justify-center rounded-full text-[var(--fg-muted)] hover:text-red-500 hover:bg-red-500/10 transition-colors" aria-label="Remove assigned question">
                         <XCircle className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -469,7 +555,13 @@ export default function TestManagementPage() {
                           <p className="text-xs text-[var(--fg)] line-clamp-2">{question.question_text}</p>
                           <p className="text-[10px] text-[var(--fg-muted)] mt-1 capitalize">{question.difficulty} - {question.marks} marks {question.year ? `- ${question.year}` : ''}</p>
                         </div>
-                        <Button size="sm" variant={isAssigned ? 'secondary' : 'primary'} disabled={isAssigned} onClick={() => addQuestion(question)}>
+                        <Button
+                          size="sm"
+                          variant={isAssigned ? 'secondary' : 'primary'}
+                          disabled={isAssigned}
+                          loading={assigningQuestionId === question.id}
+                          onClick={() => addQuestion(question)}
+                        >
                           {isAssigned ? <CheckCircle className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
                           {isAssigned ? 'Added' : 'Add'}
                         </Button>
@@ -482,6 +574,15 @@ export default function TestManagementPage() {
           </div>
         </div>
       </Dialog>
+      <ConfirmDialog
+        open={Boolean(deleteTestId)}
+        onOpenChange={(open) => !open && setDeleteTestId('')}
+        title="Delete test"
+        description="Delete this test? Existing attempts keep their history, but this test cannot be restored."
+        confirmLabel="Delete"
+        onConfirm={deleteTest}
+        loading={deleting}
+      />
     </div>
   );
 }

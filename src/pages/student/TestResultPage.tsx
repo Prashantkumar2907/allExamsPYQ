@@ -7,6 +7,9 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Dialog } from '../../components/ui/Dialog';
+import { ErrorState } from '../../components/shared/ErrorState';
+import { toast } from '../../components/ui/Toast';
+import { getErrorMessage } from '../../lib/api';
 import { cn, getScorePercentage, getAccuracy, formatTime } from '../../lib/utils';
 import { REPORT_REASONS } from '../../lib/constants';
 import {
@@ -34,6 +37,7 @@ export default function TestResultPage() {
   const navigate = useNavigate();
 
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [attempt, setAttempt] = useState<TestAttempt | null>(null);
   const [answers, setAnswers] = useState<UserAnswer[]>([]);
   const [bookmarkedIds, setBookmarkedIds] = useState<Set<string>>(new Set());
@@ -52,25 +56,39 @@ export default function TestResultPage() {
 
   async function loadResult() {
     setLoading(true);
-    const [attRes, ansRes, bmRes] = await Promise.all([
-      supabase.from('test_attempts').select('*').eq('id', attemptId!).single(),
-      supabase.from('user_answers').select('*, question:questions(*, options(*))').eq('attempt_id', attemptId!),
-      supabase.from('bookmarks').select('question_id').eq('user_id', profile!.id),
-    ]);
+    setError('');
+    try {
+      const [attRes, ansRes, bmRes] = await Promise.all([
+        supabase.from('test_attempts').select('*').eq('id', attemptId!).single(),
+        supabase.from('user_answers').select('*, question:questions(*, options(*))').eq('attempt_id', attemptId!),
+        supabase.from('bookmarks').select('question_id').eq('user_id', profile!.id),
+      ]);
 
-    if (attRes.data) {
+      if (attRes.error) throw attRes.error;
+      if (ansRes.error) throw ansRes.error;
+      if (bmRes.error) throw bmRes.error;
+      if (!attRes.data) throw new Error('This result could not be found.');
+
       setAttempt(attRes.data);
       setPage('Test Result', attRes.data.source_name);
+      setAnswers((ansRes.data || []) as UserAnswer[]);
+      setBookmarkedIds(new Set((bmRes.data || []).map((b) => b.question_id)));
+    } catch (err) {
+      setError(getErrorMessage(err, 'Unable to load this test result.'));
+    } finally {
+      setLoading(false);
     }
-    if (ansRes.data) setAnswers(ansRes.data as UserAnswer[]);
-    if (bmRes.data) setBookmarkedIds(new Set(bmRes.data.map((b) => b.question_id)));
-    setLoading(false);
   }
 
   async function toggleBookmark(questionId: string) {
     if (bookmarkedIds.has(questionId)) {
-      await supabase.from('bookmarks').delete().eq('user_id', profile!.id).eq('question_id', questionId);
+      const { error: deleteError } = await supabase.from('bookmarks').delete().eq('user_id', profile!.id).eq('question_id', questionId);
+      if (deleteError) {
+        toast.error(getErrorMessage(deleteError, 'Could not remove bookmark.'));
+        return;
+      }
       setBookmarkedIds((prev) => { const s = new Set(prev); s.delete(questionId); return s; });
+      toast.success('Bookmark removed.');
     } else {
       setBookmarkQuestionId(questionId);
       setBookmarkNote('');
@@ -81,25 +99,36 @@ export default function TestResultPage() {
   async function saveBookmark() {
     if (!bookmarkQuestionId) return;
     setSavingBookmark(true);
-    await supabase.from('bookmarks').upsert(
+    const { error: bookmarkError } = await supabase.from('bookmarks').upsert(
       { user_id: profile!.id, question_id: bookmarkQuestionId, notes: bookmarkNote || null },
       { onConflict: 'user_id,question_id' }
     );
+    if (bookmarkError) {
+      toast.error(getErrorMessage(bookmarkError, 'Could not save bookmark.'));
+      setSavingBookmark(false);
+      return;
+    }
     setBookmarkedIds((prev) => new Set(prev).add(bookmarkQuestionId));
     setSavingBookmark(false);
     setBookmarkDialogOpen(false);
+    toast.success('Bookmark saved.');
   }
 
   async function submitReport() {
     if (!reportReason.trim()) return;
-    await supabase.from('reported_questions').insert({
+    const { error: reportError } = await supabase.from('reported_questions').insert({
       user_id: profile!.id,
       question_id: reportQuestionId,
       reason: reportReason,
       status: 'pending' as const,
     });
+    if (reportError) {
+      toast.error(getErrorMessage(reportError, 'Could not submit report.'));
+      return;
+    }
     setReportDialogOpen(false);
     setReportReason('');
+    toast.success('Report submitted.');
   }
 
   if (loading) {
@@ -111,7 +140,8 @@ export default function TestResultPage() {
       </div>
     );
   }
-  if (!attempt) return null;
+  if (error) return <ErrorState description={error} onRetry={loadResult} />;
+  if (!attempt) return <ErrorState description="This result is not available." onRetry={loadResult} />;
 
   const scorePercent = getScorePercentage(attempt.score, attempt.total_marks);
   const accuracy = getAccuracy(attempt.correct_answers, attempt.total_questions);
@@ -253,6 +283,7 @@ export default function TestResultPage() {
                     onClick={() => toggleBookmark(q.id)}
                     className="h-7 w-7 flex items-center justify-center rounded-md text-[var(--fg-muted)] hover:bg-[var(--bg-surface-hover)] transition-colors"
                     title="Bookmark"
+                    aria-label={bookmarkedIds.has(q.id) ? 'Remove bookmark' : 'Add bookmark'}
                   >
                     {bookmarkedIds.has(q.id) ? (
                       <BookmarkCheck className="h-3.5 w-3.5 text-[var(--primary)]" />
@@ -264,6 +295,7 @@ export default function TestResultPage() {
                     onClick={() => { setReportQuestionId(q.id); setReportDialogOpen(true); }}
                     className="h-7 w-7 flex items-center justify-center rounded-md text-[var(--fg-muted)] hover:bg-[var(--bg-surface-hover)] transition-colors"
                     title="Report"
+                    aria-label="Report question"
                   >
                     <Flag className="h-3 w-3" />
                   </button>

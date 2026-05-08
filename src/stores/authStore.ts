@@ -1,8 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '../lib/supabase';
+import { getErrorMessage, normalizeText } from '../lib/api';
 import type { Profile } from '../types/database';
 import type { Session, User } from '@supabase/supabase-js';
+
+let authListenerRegistered = false;
 
 interface AuthState {
   user: User | null;
@@ -10,6 +13,7 @@ interface AuthState {
   session: Session | null;
   loading: boolean;
   initialized: boolean;
+  profileError: string | null;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string, fullName: string, examId?: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
@@ -26,8 +30,21 @@ export const useAuthStore = create<AuthState>()(
       session: null,
       loading: true,
       initialized: false,
+      profileError: null,
 
       initialize: async () => {
+        if (!authListenerRegistered) {
+          authListenerRegistered = true;
+          supabase.auth.onAuthStateChange(async (_event, session) => {
+            set({ user: session?.user ?? null, session });
+            if (session?.user) {
+              await get().fetchProfile(session.user.id);
+            } else {
+              set({ profile: null, profileError: null });
+            }
+          });
+        }
+
         try {
           const { data: { session } } = await supabase.auth.getSession();
           if (session?.user) {
@@ -37,29 +54,25 @@ export const useAuthStore = create<AuthState>()(
         } finally {
           set({ loading: false, initialized: true });
         }
-
-        supabase.auth.onAuthStateChange(async (_event, session) => {
-          set({ user: session?.user ?? null, session });
-          if (session?.user) {
-            await get().fetchProfile(session.user.id);
-          } else {
-            set({ profile: null });
-          }
-        });
       },
 
       fetchProfile: async (userId: string) => {
-        const { data } = await supabase
+        set({ profileError: null });
+        const { data, error } = await supabase
           .from('profiles')
           .select('*, exam:exams(*)')
           .eq('id', userId)
           .single();
-        if (data) set({ profile: data as Profile });
+        if (error) {
+          set({ profile: null, profileError: getErrorMessage(error, 'Unable to load your profile.') });
+          return;
+        }
+        if (data) set({ profile: data as Profile, profileError: null });
       },
 
       signIn: async (email, password) => {
         set({ loading: true });
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
         set({ loading: false });
         return { error: error?.message ?? null };
       },
@@ -67,9 +80,9 @@ export const useAuthStore = create<AuthState>()(
       signUp: async (email, password, fullName, examId) => {
         set({ loading: true });
         const { error } = await supabase.auth.signUp({
-          email,
+          email: email.trim(),
           password,
-          options: { data: { full_name: fullName, exam_id: examId } },
+          options: { data: { full_name: normalizeText(fullName), exam_id: examId } },
         });
         set({ loading: false });
         return { error: error?.message ?? null };
@@ -77,15 +90,22 @@ export const useAuthStore = create<AuthState>()(
 
       signOut: async () => {
         await supabase.auth.signOut();
-        set({ user: null, profile: null, session: null });
+        set({ user: null, profile: null, session: null, profileError: null });
       },
 
       updateProfile: async (data) => {
         const userId = get().user?.id;
         if (!userId) return { error: 'Not authenticated' };
+        const allowedData = {
+          ...(data.full_name != null ? { full_name: normalizeText(data.full_name) } : {}),
+          ...(data.phone !== undefined ? { phone: data.phone || null } : {}),
+          ...(data.bio !== undefined ? { bio: data.bio || null } : {}),
+          ...(data.avatar_url !== undefined ? { avatar_url: data.avatar_url || null } : {}),
+          ...(data.exam_id !== undefined ? { exam_id: data.exam_id || null } : {}),
+        };
         const { error } = await supabase
           .from('profiles')
-          .update(data)
+          .update(allowedData)
           .eq('id', userId);
         if (!error) await get().fetchProfile(userId);
         return { error: error?.message ?? null };

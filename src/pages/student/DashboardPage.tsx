@@ -4,8 +4,10 @@ import { useAuthStore } from '../../stores/authStore';
 import { usePageStore } from '../../stores/pageStore';
 import { supabase } from '../../lib/supabase';
 import { StatsCard } from '../../components/shared/StatsCard';
+import { ErrorState } from '../../components/shared/ErrorState';
 import { Card, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
+import { getErrorMessage } from '../../lib/api';
 import { cn, getAccuracy, getScorePercentage, formatDate, formatTime } from '../../lib/utils';
 import { CHART_COLORS } from '../../lib/constants';
 import {
@@ -36,6 +38,7 @@ export default function DashboardPage() {
   const setPage = usePageStore((s) => s.setPage);
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [attempts, setAttempts] = useState<TestAttempt[]>([]);
   const [syllabusProgress, setSyllabusProgress] = useState<SyllabusProgress[]>([]);
   const [totalTopics, setTotalTopics] = useState(0);
@@ -49,6 +52,7 @@ export default function DashboardPage() {
 
   async function loadData() {
     setLoading(true);
+    setError('');
     try {
     const [attRes, sylRes, topRes, testRes] = await Promise.all([
       supabase
@@ -77,16 +81,22 @@ export default function DashboardPage() {
         .limit(1),
     ]);
 
+    if (attRes.error) throw attRes.error;
+    if (sylRes.error) throw sylRes.error;
+    if ('error' in topRes && topRes.error) throw topRes.error;
+    if (testRes.error) throw testRes.error;
+
     if (attRes.data) setAttempts(attRes.data);
     if (sylRes.data) setSyllabusProgress(sylRes.data as SyllabusProgress[]);
     if (topRes.count != null) setTotalTopics(topRes.count);
     if (testRes.data?.[0]) setNextTest(testRes.data[0] as { title: string; scheduled_at: string });
     } catch (e) {
-      console.error('Dashboard load error:', e);
+      setError(getErrorMessage(e, 'Unable to load dashboard data.'));
     } finally {
       setLoading(false);
     }
   }
+  if (error) return <ErrorState description={error} onRetry={loadData} />;
 
   if (loading) {
     return (

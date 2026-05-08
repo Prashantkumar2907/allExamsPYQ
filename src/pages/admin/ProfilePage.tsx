@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Avatar } from '../../components/ui/Avatar';
 import { getAvatarUrl, AVATAR_STYLES, type AvatarStyle } from '../../lib/avatarConfig';
+import { toast } from '../../components/ui/Toast';
 import { cn } from '../../lib/utils';
 import { Save, CheckCircle } from 'lucide-react';
 
@@ -27,14 +28,19 @@ export default function ProfilePage() {
   async function handleSave() {
     setSaving(true);
     const avatarUrl = getAvatarUrl(avatarStyle, fullName);
-    await updateProfile({
+    const { error } = await updateProfile({
       full_name: fullName,
       phone: phone || null,
       bio: bio || null,
       avatar_url: avatarUrl,
     });
     setSaving(false);
+    if (error) {
+      toast.error(error);
+      return;
+    }
     setSaved(true);
+    toast.success('Profile updated.');
     setTimeout(() => setSaved(false), 2000);
   }
 
@@ -52,7 +58,7 @@ export default function ProfilePage() {
       <div className="relative rounded-2xl bg-gradient-to-br from-[var(--primary)]/20 via-[var(--primary)]/10 to-transparent p-5 pt-6 flex flex-col items-center text-center border border-[var(--border)]">
         <Avatar name={fullName} src={getAvatarUrl(avatarStyle, fullName)} size="lg" />
         <h1 className="text-xl font-bold text-[var(--fg)] mt-3">{fullName}</h1>
-        <p className="text-xs text-[var(--fg-muted)] mt-0.5">{profile.email} · Admin</p>
+        <p className="text-xs text-[var(--fg-muted)] mt-0.5">{profile.email} - Admin</p>
       </div>
 
       {/* Personal Info */}
@@ -71,6 +77,7 @@ export default function ProfilePage() {
             <button
               key={style}
               onClick={() => setAvatarStyle(style)}
+              aria-label={`Use ${style} avatar style`}
               className={cn(
                 'relative rounded-xl border-2 p-1 transition-all',
                 avatarStyle === style

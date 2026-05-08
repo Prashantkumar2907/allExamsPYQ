@@ -34,7 +34,10 @@ export function Dialog({ open, onOpenChange, title, description, children, class
                 </DialogPrimitive.Description>
               )}
             </div>
-            <DialogPrimitive.Close className="h-7 w-7 inline-flex items-center justify-center rounded-md text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-surface-hover)] transition-colors duration-150 focus-ring">
+            <DialogPrimitive.Close
+              className="h-7 w-7 inline-flex items-center justify-center rounded-md text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-surface-hover)] transition-colors duration-150 focus-ring"
+              aria-label="Close dialog"
+            >
               <X className="h-3.5 w-3.5" />
             </DialogPrimitive.Close>
           </div>

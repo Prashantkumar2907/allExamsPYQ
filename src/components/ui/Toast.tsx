@@ -54,6 +54,8 @@ function ToastItem({ toast }: { toast: Toast }) {
         'flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border shadow-lg backdrop-blur-sm animate-toast-in',
         'bg-[var(--bg-surface)] border-[var(--border)]'
       )}
+      role="status"
+      aria-live="polite"
     >
       <div className={cn('h-7 w-7 rounded-lg flex items-center justify-center flex-shrink-0', colors[toast.type])}>
         <Icon className="h-4 w-4" />
@@ -62,6 +64,7 @@ function ToastItem({ toast }: { toast: Toast }) {
       <button
         onClick={() => dismiss(toast.id)}
         className="h-6 w-6 flex items-center justify-center rounded-md text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-surface-hover)] transition-colors flex-shrink-0 cursor-pointer"
+        aria-label="Dismiss notification"
       >
         <X className="h-3.5 w-3.5" />
       </button>

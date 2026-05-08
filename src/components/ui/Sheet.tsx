@@ -35,7 +35,10 @@ export function Sheet({ open, onOpenChange, title, description, children, classN
                 </DialogPrimitive.Description>
               )}
             </div>
-            <DialogPrimitive.Close className="ml-2 h-7 w-7 inline-flex items-center justify-center rounded-md text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-surface-hover)] transition-colors duration-150 flex-shrink-0">
+            <DialogPrimitive.Close
+              className="ml-2 h-7 w-7 inline-flex items-center justify-center rounded-md text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-surface-hover)] transition-colors duration-150 flex-shrink-0 focus-ring"
+              aria-label="Close panel"
+            >
               <X className="h-3.5 w-3.5" />
             </DialogPrimitive.Close>
           </div>

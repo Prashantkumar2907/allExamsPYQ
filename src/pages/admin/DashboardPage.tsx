@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { usePageStore } from '../../stores/pageStore';
 import { StatsCard } from '../../components/shared/StatsCard';
+import { ErrorState } from '../../components/shared/ErrorState';
 import { Card, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { CHART_COLORS } from '../../lib/constants';
+import { getErrorMessage } from '../../lib/api';
 import { cn, formatDate } from '../../lib/utils';
 import {
   Users, BookOpen, FileText, ClipboardList, Activity,
@@ -16,12 +18,22 @@ import {
   PieChart, Pie, Cell,
 } from 'recharts';
 
+interface RecentAttempt {
+  id: string;
+  source_name: string;
+  score: number;
+  total_marks: number;
+  completed_at: string | null;
+  profile: { full_name: string } | null;
+}
+
 export default function DashboardPage() {
   const setPage = usePageStore((s) => s.setPage);
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [stats, setStats] = useState({ users: 0, exams: 0, questions: 0, tests: 0, attempts: 0 });
-  const [recentAttempts, setRecentAttempts] = useState<{ id: string; source_name: string; score: number; total_marks: number; completed_at: string; profile: { full_name: string } }[]>([]);
+  const [recentAttempts, setRecentAttempts] = useState<RecentAttempt[]>([]);
   const [reportedCount, setReportedCount] = useState(0);
   const [difficultyData, setDifficultyData] = useState<{ name: string; count: number }[]>([]);
   const [dailyAttempts, setDailyAttempts] = useState<{ date: string; count: number }[]>([]);
@@ -32,6 +44,8 @@ export default function DashboardPage() {
   }, []);
 
   async function loadStats() {
+    setLoading(true);
+    setError('');
     try {
       const [usersRes, examsRes, questionsRes, testsRes, attemptsRes, recentRes, reportRes, diffRes] = await Promise.all([
         supabase.from('profiles').select('id', { count: 'exact', head: true }),
@@ -44,6 +58,10 @@ export default function DashboardPage() {
         supabase.from('questions').select('difficulty').limit(5000),
       ]);
 
+      [usersRes, examsRes, questionsRes, testsRes, attemptsRes, recentRes, reportRes, diffRes].forEach((res) => {
+        if (res.error) throw res.error;
+      });
+
       setStats({
         users: usersRes.count || 0,
         exams: examsRes.count || 0,
@@ -52,26 +70,29 @@ export default function DashboardPage() {
         attempts: attemptsRes.count || 0,
       });
 
-      if (recentRes.data) setRecentAttempts(recentRes.data as any);
+      if (recentRes.data) setRecentAttempts(recentRes.data as unknown as RecentAttempt[]);
       setReportedCount(reportRes.count || 0);
 
       if (diffRes.data) {
         const counts: Record<string, number> = {};
-        diffRes.data.forEach((q: any) => { counts[q.difficulty] = (counts[q.difficulty] || 0) + 1; });
+        (diffRes.data as { difficulty: string | null }[]).forEach((q) => {
+          if (q.difficulty) counts[q.difficulty] = (counts[q.difficulty] || 0) + 1;
+        });
         setDifficultyData(Object.entries(counts).map(([name, count]) => ({ name, count })));
       }
 
       // Get daily attempts for last 7 days
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      const { data: dailyData } = await supabase.from('test_attempts').select('completed_at').eq('status', 'completed').gte('completed_at', sevenDaysAgo.toISOString()).limit(10000);
+      const { data: dailyData, error: dailyError } = await supabase.from('test_attempts').select('completed_at').eq('status', 'completed').gte('completed_at', sevenDaysAgo.toISOString()).limit(10000);
+      if (dailyError) throw dailyError;
       if (dailyData) {
         const dayCounts: Record<string, number> = {};
         for (let i = 6; i >= 0; i--) {
           const d = new Date(); d.setDate(d.getDate() - i);
           dayCounts[d.toLocaleDateString('en-US', { weekday: 'short' })] = 0;
         }
-        dailyData.forEach((a: any) => {
+        (dailyData as { completed_at: string | null }[]).forEach((a) => {
           if (a.completed_at) {
             const day = new Date(a.completed_at).toLocaleDateString('en-US', { weekday: 'short' });
             if (day in dayCounts) dayCounts[day]++;
@@ -79,7 +100,7 @@ export default function DashboardPage() {
         });
         setDailyAttempts(Object.entries(dayCounts).map(([date, count]) => ({ date, count })));
       }
-    } catch (err) { console.error('Failed to load admin stats:', err); }
+    } catch (err) { setError(getErrorMessage(err, 'Unable to load admin dashboard.')); }
     finally { setLoading(false); }
   }
 
@@ -97,6 +118,7 @@ export default function DashboardPage() {
       </div>
     );
   }
+  if (error) return <ErrorState description={error} onRetry={loadStats} />;
 
   const diffColors: Record<string, string> = { easy: '#22c55e', medium: '#f59e0b', hard: '#ef4444' };
 
@@ -105,7 +127,7 @@ export default function DashboardPage() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[var(--fg)]">Admin Dashboard</h1>
-          <p className="text-sm text-[var(--fg-muted)] mt-1">Welcome back — here's your platform overview.</p>
+          <p className="text-sm text-[var(--fg-muted)] mt-1">Welcome back - here's your platform overview.</p>
         </div>
         {reportedCount > 0 && (
           <button onClick={() => navigate('/admin/reports')} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-600 text-xs font-medium hover:bg-amber-500/15 transition-colors">
@@ -209,7 +231,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-[var(--fg)] truncate">{a.source_name}</p>
-                    <p className="text-[11px] text-[var(--fg-muted)]">{(a.profile as any)?.full_name || 'Unknown'} · {a.score}/{a.total_marks}</p>
+                    <p className="text-[11px] text-[var(--fg-muted)]">{a.profile?.full_name || 'Unknown'} - {a.score}/{a.total_marks}</p>
                   </div>
                   <span className="text-[11px] text-[var(--fg-muted)] flex-shrink-0">{a.completed_at ? formatDate(a.completed_at) : ''}</span>
                 </div>

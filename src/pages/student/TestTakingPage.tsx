@@ -6,6 +6,10 @@ import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
+import { EmptyState } from '../../components/shared/EmptyState';
+import { ErrorState } from '../../components/shared/ErrorState';
+import { toast } from '../../components/ui/Toast';
+import { getErrorMessage } from '../../lib/api';
 import { cn } from '../../lib/utils';
 import {
   Clock,
@@ -26,6 +30,7 @@ export default function TestTakingPage() {
   const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState<TestAttempt | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [error, setError] = useState('');
   const [answers, setAnswers] = useState<Record<string, string | null>>({});
   const [flagged, setFlagged] = useState<Set<string>>(new Set());
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -53,66 +58,76 @@ export default function TestTakingPage() {
 
   async function loadAttempt() {
     setLoading(true);
-    const { data: att } = await supabase
-      .from('test_attempts')
-      .select('*')
-      .eq('id', attemptId!)
-      .single();
+    setError('');
 
-    if (!att || att.status === 'completed') {
-      navigate(`/result/${attemptId}`);
-      return;
-    }
+    try {
+      const { data: att, error: attemptError } = await supabase
+        .from('test_attempts')
+        .select('*')
+        .eq('id', attemptId!)
+        .single();
 
-    setAttempt(att);
-    attemptRef.current = att;
+      if (attemptError) throw attemptError;
+      if (!att) throw new Error('This test attempt could not be found.');
+      if (att.status === 'completed') {
+        navigate(`/result/${attemptId}`);
+        return;
+      }
 
-    // Load existing answers
-    const { data: userAnswers } = await supabase
-      .from('user_answers')
-      .select('question_id, selected_option_id')
-      .eq('attempt_id', attemptId!);
+      setAttempt(att);
+      attemptRef.current = att;
 
-    const questionIds = userAnswers?.map((a) => a.question_id) ?? [];
-    const existingAnswers: Record<string, string | null> = {};
-    userAnswers?.forEach((a) => {
-      existingAnswers[a.question_id] = a.selected_option_id;
-    });
-    setAnswers(existingAnswers);
+      const { data: userAnswers, error: answersError } = await supabase
+        .from('user_answers')
+        .select('question_id, selected_option_id')
+        .eq('attempt_id', attemptId!);
 
-    // Load questions
-    if (questionIds.length > 0) {
-      const { data: qData } = await supabase
+      if (answersError) throw answersError;
+
+      const questionIds = userAnswers?.map((a) => a.question_id) ?? [];
+      const existingAnswers: Record<string, string | null> = {};
+      userAnswers?.forEach((a) => {
+        existingAnswers[a.question_id] = a.selected_option_id;
+      });
+      setAnswers(existingAnswers);
+
+      if (questionIds.length > 0) {
+        const { data: qData, error: questionsError } = await supabase
         .from('questions')
         .select('*, options(*)')
         .in('id', questionIds);
-      if (qData) {
-        // Preserve order
-        const qMap = new Map(qData.map((q) => [q.id, q]));
-        const orderedQuestions = questionIds.map((id) => qMap.get(id)!).filter(Boolean);
-        setQuestions(orderedQuestions);
-        questionsRef.current = orderedQuestions;
-      }
-    }
-
-    // Timer
-    const durationMs = (att.duration_minutes ?? 60) * 60 * 1000;
-    const elapsed = Date.now() - new Date(att.started_at).getTime();
-    const remaining = Math.max(0, Math.floor((durationMs - elapsed) / 1000));
-    setTimeLeft(remaining);
-
-    timerRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          if (timerRef.current) clearInterval(timerRef.current);
-          void handleSubmit();
-          return 0;
+        if (questionsError) throw questionsError;
+        if (qData) {
+          const qMap = new Map(qData.map((q) => [q.id, q]));
+          const orderedQuestions = questionIds.map((id) => qMap.get(id)!).filter(Boolean);
+          setQuestions(orderedQuestions);
+          questionsRef.current = orderedQuestions;
         }
-        return prev - 1;
-      });
-    }, 1000);
+      } else {
+        setQuestions([]);
+        questionsRef.current = [];
+      }
 
-    setLoading(false);
+      const durationMs = (att.duration_minutes ?? 60) * 60 * 1000;
+      const elapsed = Date.now() - new Date(att.started_at).getTime();
+      const remaining = Math.max(0, Math.floor((durationMs - elapsed) / 1000));
+      setTimeLeft(remaining);
+
+      timerRef.current = setInterval(() => {
+        setTimeLeft((prev) => {
+          if (prev <= 1) {
+            if (timerRef.current) clearInterval(timerRef.current);
+            void handleSubmit();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } catch (err) {
+      setError(getErrorMessage(err, 'Unable to load this test attempt.'));
+    } finally {
+      setLoading(false);
+    }
   }
 
   const selectAnswer = useCallback(async (questionId: string, optionId: string) => {
@@ -123,7 +138,7 @@ export default function TestTakingPage() {
     });
     const question = questions.find((q) => q.id === questionId);
     const option = question?.options?.find((o) => o.id === optionId);
-    await supabase
+    const { error: saveError } = await supabase
       .from('user_answers')
       .update({
         selected_option_id: optionId,
@@ -131,6 +146,7 @@ export default function TestTakingPage() {
       })
       .eq('attempt_id', attemptId!)
       .eq('question_id', questionId);
+    if (saveError) toast.error(getErrorMessage(saveError, 'Could not save that answer.'));
   }, [questions, attemptId]);
 
   async function handleSubmit() {
@@ -139,96 +155,101 @@ export default function TestTakingPage() {
     setSubmitting(true);
     if (timerRef.current) clearInterval(timerRef.current);
 
-    const latestQuestions = questionsRef.current;
-    const latestAnswers = answersRef.current;
-    const latestAttempt = attemptRef.current;
-    let correct = 0;
-    let wrong = 0;
-    let skipped = 0;
-    let score = 0;
+    try {
+      const latestQuestions = questionsRef.current;
+      const latestAnswers = answersRef.current;
+      const latestAttempt = attemptRef.current;
 
-    latestQuestions.forEach((q) => {
-      const selectedId = latestAnswers[q.id];
-      if (!selectedId) {
-        skipped++;
-        return;
+      if (latestQuestions.length === 0) {
+        throw new Error('This attempt has no questions to submit.');
       }
-      const option = q.options?.find((o) => o.id === selectedId);
-      if (option?.is_correct) {
-        correct++;
-        score += q.marks;
-      } else {
-        wrong++;
-        score -= q.negative_marks;
+
+      let correct = 0;
+      let wrong = 0;
+      let skipped = 0;
+      let score = 0;
+
+      latestQuestions.forEach((q) => {
+        const selectedId = latestAnswers[q.id];
+        if (!selectedId) {
+          skipped++;
+          return;
+        }
+        const option = q.options?.find((o) => o.id === selectedId);
+        if (option?.is_correct) {
+          correct++;
+          score += q.marks;
+        } else {
+          wrong++;
+          score -= q.negative_marks;
+        }
+      });
+
+      const finalScore = Math.max(0, score);
+      const startedAt = latestAttempt?.started_at ? new Date(latestAttempt.started_at).getTime() : Date.now();
+      const timeTaken = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+
+      const { error: submitError } = await supabase
+        .from('test_attempts')
+        .update({
+          score: finalScore,
+          correct_answers: correct,
+          wrong_answers: wrong,
+          skipped,
+          time_taken_seconds: timeTaken,
+          status: 'completed' as const,
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', attemptId!);
+
+      if (submitError) throw submitError;
+
+      if (latestAttempt?.source_type !== 'test' && profile?.id) {
+        const topicIds = [...new Set(latestQuestions.map((q) => q.topic_id).filter(Boolean))];
+        if (topicIds.length > 0) {
+          const { error: progressError } = await supabase.from('syllabus_progress').upsert(
+            topicIds.map((topicId) => ({
+              user_id: profile.id,
+              topic_id: topicId,
+              is_completed: true,
+              completed_at: new Date().toISOString(),
+            })),
+            { onConflict: 'user_id,topic_id' }
+          );
+          if (progressError) toast.warning(getErrorMessage(progressError, 'Progress could not be updated.'));
+        }
       }
-    });
 
-    const startedAt = latestAttempt?.started_at ? new Date(latestAttempt.started_at).getTime() : Date.now();
-    const timeTaken = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
-
-    await supabase
-      .from('test_attempts')
-      .update({
-        score: Math.max(0, score),
-        correct_answers: correct,
-        wrong_answers: wrong,
-        skipped,
-        time_taken_seconds: timeTaken,
-        status: 'completed' as const,
-        completed_at: new Date().toISOString(),
-      })
-      .eq('id', attemptId!);
-
-    if (latestAttempt?.source_type !== 'test' && profile?.id) {
-      const topicIds = [...new Set(latestQuestions.map((q) => q.topic_id).filter(Boolean))];
-      if (topicIds.length > 0) {
-        await supabase.from('syllabus_progress').upsert(
-          topicIds.map((topicId) => ({
-            user_id: profile.id,
-            topic_id: topicId,
-            is_completed: true,
-            completed_at: new Date().toISOString(),
-          })),
-          { onConflict: 'user_id,topic_id' }
-        );
-      }
-    }
-
-    // Update leaderboard if this was a formal test
-    if (latestAttempt?.test_id && profile?.exam_id) {
-      const { data: existing } = await supabase
-        .from('leaderboard_scores')
-        .select('*')
-        .eq('user_id', profile.id)
-        .eq('exam_id', profile.exam_id)
-        .single();
-
-      if (existing) {
-        await supabase
-          .from('leaderboard_scores')
-          .update({
-            total_score: existing.total_score + Math.max(0, score),
-            tests_taken: existing.tests_taken + 1,
-            total_correct: existing.total_correct + correct,
-            total_questions: existing.total_questions + latestQuestions.length,
-          })
-          .eq('id', existing.id);
-      } else {
-        await supabase.from('leaderboard_scores').insert({
-          user_id: profile.id,
-          exam_id: profile.exam_id,
-          total_score: Math.max(0, score),
-          tests_taken: 1,
-          total_correct: correct,
-          total_questions: latestQuestions.length,
+      if (latestAttempt?.test_id && profile?.exam_id) {
+        const { error: leaderboardError } = await supabase.rpc('record_leaderboard_attempt', {
+          p_exam_id: profile.exam_id,
+          p_user_id: profile.id,
+          p_score: finalScore,
+          p_correct: correct,
+          p_questions: latestQuestions.length,
         });
+        if (leaderboardError) toast.warning(getErrorMessage(leaderboardError, 'Leaderboard could not be updated.'));
       }
-    }
 
-    navigate(`/result/${attemptId}`);
+      navigate(`/result/${attemptId}`);
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Could not submit this test.'));
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
   }
 
   if (loading) return <LoadingSpinner />;
+  if (error) return <ErrorState description={error} onRetry={loadAttempt} />;
+  if (!questions.length) {
+    return (
+      <EmptyState
+        title="No questions in this attempt"
+        description="Ask an admin to add questions to this test before starting it."
+        action={<Button size="sm" variant="secondary" onClick={() => navigate('/tests')}>Back to Tests</Button>}
+      />
+    );
+  }
 
   const question = questions[currentIdx];
   const mins = Math.floor(timeLeft / 60);
