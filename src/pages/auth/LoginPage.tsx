@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { GraduationCap, Mail, Lock, Eye, EyeOff, Sun, Moon, ArrowLeft } from 'lucide-react';
 import { APP_NAME } from '../../lib/constants';
+import { isDemoMode } from '../../lib/env';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -16,6 +17,16 @@ export default function LoginPage() {
   const { toggleTheme, resolvedTheme } = useThemeStore();
   const isDark = resolvedTheme() === 'dark';
   const navigate = useNavigate();
+
+  function fillDemoAccount(role: 'student' | 'admin') {
+    if (role === 'admin') {
+      setEmail('admin@allexamspyq.local');
+      setPassword('Admin@12345');
+      return;
+    }
+    setEmail('demoaccount@allexamspyq.local');
+    setPassword('Demo@12345');
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,6 +68,19 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-3.5">
+            {isDemoMode && (
+              <div className="space-y-2 rounded-xl border border-[var(--primary)]/20 bg-[var(--primary)]/5 p-3">
+                <p className="text-xs font-medium text-[var(--fg)]">Demo mode is active</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button type="button" variant="secondary" size="sm" onClick={() => fillDemoAccount('student')}>
+                    Demo Student
+                  </Button>
+                  <Button type="button" variant="secondary" size="sm" onClick={() => fillDemoAccount('admin')}>
+                    Demo Admin
+                  </Button>
+                </div>
+              </div>
+            )}
             <Input
               id="email"
               label="Email"

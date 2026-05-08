@@ -3,22 +3,22 @@ import { cn } from '../../lib/utils';
 import { forwardRef, type ButtonHTMLAttributes } from 'react';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-all duration-150 ease-out focus-ring cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97]',
+  'inline-flex items-center justify-center gap-2 rounded-full font-medium leading-none transition-all duration-150 ease-out focus-ring cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none active:translate-y-0',
   {
     variants: {
       variant: {
-        primary: 'bg-[var(--primary)] text-[var(--primary-fg)] hover:bg-[var(--primary-hover)] active:bg-[var(--primary-active)] shadow-[0_1px_2px_rgba(108,195,224,0.3)] hover:shadow-md',
-        secondary: 'bg-[var(--bg-surface)] text-[var(--fg)] border border-[var(--border)] hover:bg-[var(--bg-surface-hover)] hover:border-[var(--border-strong)]',
-        ghost: 'text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-surface-hover)]/80',
-        danger: 'bg-[var(--danger)] text-white hover:bg-[var(--danger-hover)] shadow-[0_1px_2px_rgba(220,38,38,0.3)] hover:shadow-md',
+        primary: 'bg-[var(--primary)] text-[var(--primary-fg)] hover:bg-[var(--primary-hover)] active:bg-[var(--primary-active)] shadow-xs',
+        secondary: 'bg-[var(--bg-surface)] text-[var(--fg)] border border-[var(--border-strong)] hover:bg-[var(--bg-surface-hover)] hover:border-[#B0BEC5] shadow-xs',
+        ghost: 'text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--primary)]/10',
+        danger: 'bg-[var(--danger)] text-white hover:bg-[var(--danger-hover)] shadow-xs',
         outline: 'bg-transparent text-[var(--primary)] border border-[var(--primary)] hover:bg-[var(--primary)]/10',
         link: 'text-[var(--primary)] hover:text-[var(--primary-hover)] underline-offset-2 hover:underline p-0 h-auto',
       },
       size: {
-        sm: 'h-8 px-2.5 text-xs',
-        md: 'h-9 px-3.5 text-sm',
+        sm: 'h-8 px-3 text-[11px]',
+        md: 'h-9 px-4 text-xs',
         lg: 'h-10 px-5 text-sm',
-        icon: 'h-9 w-9',
+        icon: 'h-9 w-9 p-2',
       },
     },
     defaultVariants: {

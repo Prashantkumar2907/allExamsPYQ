@@ -23,7 +23,7 @@ export function Select({ value, onValueChange, options, placeholder = 'Select...
       <SelectPrimitive.Root value={value} onValueChange={onValueChange}>
         <SelectPrimitive.Trigger
           className={cn(
-            'inline-flex items-center justify-between w-full h-9 px-2.5 text-sm rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--fg)] hover:border-[var(--border-strong)] transition-all duration-150 focus-ring cursor-pointer',
+            'inline-flex items-center justify-between w-full h-9 px-2.5 text-sm rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--fg)] hover:border-[var(--border-strong)] transition-all duration-200 focus-ring cursor-pointer',
             className
           )}
         >

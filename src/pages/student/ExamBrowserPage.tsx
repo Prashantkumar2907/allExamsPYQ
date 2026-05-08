@@ -105,9 +105,28 @@ export default function ExamBrowserPage() {
           .limit(20);
         questionIds = data?.map((q) => q.id) ?? [];
       }
+    } else if (sourceType === 'subject') {
+      const { data: chapterData } = await supabase.from('chapters').select('id').eq('subject_id', sourceId);
+      const chapterIds = chapterData?.map((chapter) => chapter.id) ?? [];
+      if (chapterIds.length > 0) {
+        const { data: topicData } = await supabase.from('topics').select('id').in('chapter_id', chapterIds);
+        const topicIds = topicData?.map((topic) => topic.id) ?? [];
+        if (topicIds.length > 0) {
+          const { data } = await supabase
+            .from('questions')
+            .select('id')
+            .in('topic_id', topicIds)
+            .eq('is_active', true)
+            .limit(20);
+          questionIds = data?.map((q) => q.id) ?? [];
+        }
+      }
     }
 
-    if (questionIds.length === 0) return;
+    if (questionIds.length === 0) {
+      window.alert('No active questions found for this selection yet.');
+      return;
+    }
 
     const totalMarks = questionIds.length * 4;
     const { data: attempt } = await supabase
@@ -208,7 +227,20 @@ export default function ExamBrowserPage() {
                     <p className="text-[11px] text-[var(--fg-muted)] truncate mt-0.5">{s.description}</p>
                   )}
                 </div>
-                <ChevronRight className="h-4 w-4 text-[var(--fg-muted)] group-hover:text-[var(--primary)] group-hover:translate-x-0.5 transition-all flex-shrink-0" />
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      startPractice('subject', s.id, s.name);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Play className="h-3 w-3" /> Practice
+                  </Button>
+                  <ChevronRight className="h-4 w-4 text-[var(--fg-muted)] group-hover:text-[var(--primary)] group-hover:translate-x-0.5 transition-all" />
+                </div>
               </div>
             </Card>
           ))}

@@ -5,6 +5,7 @@ import { Menu, Sun, Moon, LogOut, ChevronDown, User, Loader2 } from 'lucide-reac
 import { useThemeStore } from '../../stores/themeStore';
 import { useAuthStore } from '../../stores/authStore';
 import { usePageStore } from '../../stores/pageStore';
+import { isDemoMode } from '../../lib/env';
 import { Avatar } from '../ui/Avatar';
 import { Button } from '../ui/Button';
 
@@ -39,6 +40,11 @@ export function Header({ onMenuClick }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-1.5">
+        {isDemoMode && (
+          <span className="hidden sm:inline-flex rounded-full border border-[var(--primary)]/25 bg-[var(--primary)]/10 px-2.5 py-1 text-[10px] font-semibold text-[var(--primary)]">
+            Demo
+          </span>
+        )}
         <Button variant="ghost" size="icon" onClick={toggleTheme} aria-label="Toggle theme">
           {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </Button>

@@ -32,7 +32,18 @@ export default function TestTakingPage() {
   const [timeLeft, setTimeLeft] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const startTimeRef = useRef(Date.now());
+  const attemptRef = useRef<TestAttempt | null>(null);
+  const questionsRef = useRef<Question[]>([]);
+  const answersRef = useRef<Record<string, string | null>>({});
+  const submittingRef = useRef(false);
+
+  useEffect(() => {
+    questionsRef.current = questions;
+  }, [questions]);
+
+  useEffect(() => {
+    answersRef.current = answers;
+  }, [answers]);
 
   useEffect(() => {
     setPage('Test', '');
@@ -54,6 +65,7 @@ export default function TestTakingPage() {
     }
 
     setAttempt(att);
+    attemptRef.current = att;
 
     // Load existing answers
     const { data: userAnswers } = await supabase
@@ -77,7 +89,9 @@ export default function TestTakingPage() {
       if (qData) {
         // Preserve order
         const qMap = new Map(qData.map((q) => [q.id, q]));
-        setQuestions(questionIds.map((id) => qMap.get(id)!).filter(Boolean));
+        const orderedQuestions = questionIds.map((id) => qMap.get(id)!).filter(Boolean);
+        setQuestions(orderedQuestions);
+        questionsRef.current = orderedQuestions;
       }
     }
 
@@ -86,13 +100,12 @@ export default function TestTakingPage() {
     const elapsed = Date.now() - new Date(att.started_at).getTime();
     const remaining = Math.max(0, Math.floor((durationMs - elapsed) / 1000));
     setTimeLeft(remaining);
-    startTimeRef.current = Date.now();
 
     timerRef.current = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           if (timerRef.current) clearInterval(timerRef.current);
-          handleSubmit();
+          void handleSubmit();
           return 0;
         }
         return prev - 1;
@@ -103,7 +116,11 @@ export default function TestTakingPage() {
   }
 
   const selectAnswer = useCallback(async (questionId: string, optionId: string) => {
-    setAnswers((prev) => ({ ...prev, [questionId]: optionId }));
+    setAnswers((prev) => {
+      const next = { ...prev, [questionId]: optionId };
+      answersRef.current = next;
+      return next;
+    });
     const question = questions.find((q) => q.id === questionId);
     const option = question?.options?.find((o) => o.id === optionId);
     await supabase
@@ -117,17 +134,21 @@ export default function TestTakingPage() {
   }, [questions, attemptId]);
 
   async function handleSubmit() {
-    if (submitting) return;
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setSubmitting(true);
     if (timerRef.current) clearInterval(timerRef.current);
 
+    const latestQuestions = questionsRef.current;
+    const latestAnswers = answersRef.current;
+    const latestAttempt = attemptRef.current;
     let correct = 0;
     let wrong = 0;
     let skipped = 0;
     let score = 0;
 
-    questions.forEach((q) => {
-      const selectedId = answers[q.id];
+    latestQuestions.forEach((q) => {
+      const selectedId = latestAnswers[q.id];
       if (!selectedId) {
         skipped++;
         return;
@@ -142,7 +163,8 @@ export default function TestTakingPage() {
       }
     });
 
-    const timeTaken = Math.floor((Date.now() - startTimeRef.current) / 1000);
+    const startedAt = latestAttempt?.started_at ? new Date(latestAttempt.started_at).getTime() : Date.now();
+    const timeTaken = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
 
     await supabase
       .from('test_attempts')
@@ -157,8 +179,23 @@ export default function TestTakingPage() {
       })
       .eq('id', attemptId!);
 
+    if (latestAttempt?.source_type !== 'test' && profile?.id) {
+      const topicIds = [...new Set(latestQuestions.map((q) => q.topic_id).filter(Boolean))];
+      if (topicIds.length > 0) {
+        await supabase.from('syllabus_progress').upsert(
+          topicIds.map((topicId) => ({
+            user_id: profile.id,
+            topic_id: topicId,
+            is_completed: true,
+            completed_at: new Date().toISOString(),
+          })),
+          { onConflict: 'user_id,topic_id' }
+        );
+      }
+    }
+
     // Update leaderboard if this was a formal test
-    if (attempt?.test_id && profile?.exam_id) {
+    if (latestAttempt?.test_id && profile?.exam_id) {
       const { data: existing } = await supabase
         .from('leaderboard_scores')
         .select('*')
@@ -173,7 +210,7 @@ export default function TestTakingPage() {
             total_score: existing.total_score + Math.max(0, score),
             tests_taken: existing.tests_taken + 1,
             total_correct: existing.total_correct + correct,
-            total_questions: existing.total_questions + questions.length,
+            total_questions: existing.total_questions + latestQuestions.length,
           })
           .eq('id', existing.id);
       } else {
@@ -183,7 +220,7 @@ export default function TestTakingPage() {
           total_score: Math.max(0, score),
           tests_taken: 1,
           total_correct: correct,
-          total_questions: questions.length,
+          total_questions: latestQuestions.length,
         });
       }
     }

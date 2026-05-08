@@ -8,6 +8,7 @@ import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { GraduationCap, User, Mail, Lock, Eye, EyeOff, BookOpen, Sun, Moon, ArrowLeft } from 'lucide-react';
 import { APP_NAME } from '../../lib/constants';
+import { isSupabaseConfigured } from '../../lib/env';
 import type { Exam } from '../../types/database';
 
 export default function RegisterPage() {
@@ -24,6 +25,7 @@ export default function RegisterPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (!isSupabaseConfigured) return;
     supabase
       .from('exams')
       .select('*')
@@ -78,6 +80,11 @@ export default function RegisterPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {!isSupabaseConfigured && (
+              <div className="text-xs text-[var(--warning)] bg-[var(--warning)]/10 px-3 py-2 rounded-lg">
+                Supabase is not configured. Copy .env.example to .env.local and set the local or hosted keys before creating accounts.
+              </div>
+            )}
             {/* Account Details Section */}
             <div className="space-y-3">
               <div className="flex items-center gap-2 text-xs font-medium text-[var(--fg-muted)]">

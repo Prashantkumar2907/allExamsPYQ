@@ -7,15 +7,15 @@ import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
 import { Dialog } from '../../components/ui/Dialog';
 import { EmptyState } from '../../components/shared/EmptyState';
-import { Plus, Pencil, Trash2, ClipboardList, Globe, Calendar } from 'lucide-react';
+import { Plus, Pencil, Trash2, ClipboardList, Globe, Calendar, ListPlus, CheckCircle, XCircle } from 'lucide-react';
 import { formatDate } from '../../lib/utils';
-import type { Exam } from '../../types/database';
+import type { Exam, Subject, Chapter, Topic, Difficulty } from '../../types/database';
 
 interface TestItem {
   id: string;
   title: string;
   description: string | null;
-  exam_id: string;
+  exam_id: string | null;
   is_global: boolean;
   duration_minutes: number;
   total_marks: number;
@@ -29,13 +29,40 @@ interface TestItem {
   exam?: { name: string };
 }
 
+interface QuestionPickerItem {
+  id: string;
+  question_text: string;
+  difficulty: Difficulty;
+  marks: number;
+  year: number | null;
+}
+
+interface AssignedQuestionItem {
+  id: string;
+  question_id: string;
+  sort_order: number;
+  question: QuestionPickerItem | null;
+}
+
 export default function TestManagementPage() {
   const setPage = usePageStore((s) => s.setPage);
   const [loading, setLoading] = useState(true);
   const [tests, setTests] = useState<TestItem[]>([]);
   const [exams, setExams] = useState<Exam[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [topics, setTopics] = useState<Topic[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTest, setEditTest] = useState<TestItem | null>(null);
+  const [questionDialogOpen, setQuestionDialogOpen] = useState(false);
+  const [questionTest, setQuestionTest] = useState<TestItem | null>(null);
+  const [assignedQuestions, setAssignedQuestions] = useState<AssignedQuestionItem[]>([]);
+  const [availableQuestions, setAvailableQuestions] = useState<QuestionPickerItem[]>([]);
+  const [questionExamId, setQuestionExamId] = useState('');
+  const [questionSubjectId, setQuestionSubjectId] = useState('');
+  const [questionChapterId, setQuestionChapterId] = useState('');
+  const [questionTopicId, setQuestionTopicId] = useState('');
+  const [questionLoading, setQuestionLoading] = useState(false);
 
   const [form, setForm] = useState({
     title: '',
@@ -80,7 +107,7 @@ export default function TestManagementPage() {
     setForm({
       title: t.title,
       description: t.description || '',
-      exam_id: t.exam_id,
+      exam_id: t.exam_id || '',
       is_global: t.is_global,
       duration_minutes: t.duration_minutes,
       total_marks: t.total_marks,
@@ -124,6 +151,115 @@ export default function TestManagementPage() {
     const { error } = await supabase.from('tests').delete().eq('id', id);
     if (error) { alert(`Delete failed: ${error.message}`); return; }
     loadData();
+  }
+
+  async function openQuestionManager(test: TestItem) {
+    setQuestionTest(test);
+    setQuestionDialogOpen(true);
+    setAssignedQuestions([]);
+    setAvailableQuestions([]);
+    setSubjects([]);
+    setChapters([]);
+    setTopics([]);
+    setQuestionExamId(test.exam_id || '');
+    setQuestionSubjectId('');
+    setQuestionChapterId('');
+    setQuestionTopicId('');
+    await loadAssignedQuestions(test.id);
+    if (test.exam_id) await loadQuestionSubjects(test.exam_id);
+  }
+
+  async function loadAssignedQuestions(testId: string) {
+    const { data } = await supabase
+      .from('test_questions')
+      .select('id, question_id, sort_order, question:questions(id, question_text, difficulty, marks, year)')
+      .eq('test_id', testId)
+      .order('sort_order');
+    if (data) setAssignedQuestions(data as unknown as AssignedQuestionItem[]);
+  }
+
+  async function loadQuestionSubjects(examId: string) {
+    const { data } = await supabase.from('subjects').select('*').eq('exam_id', examId).order('sort_order');
+    setSubjects(data || []);
+  }
+
+  async function loadQuestionChapters(subjectId: string) {
+    const { data } = await supabase.from('chapters').select('*').eq('subject_id', subjectId).order('sort_order');
+    setChapters(data || []);
+  }
+
+  async function loadQuestionTopics(chapterId: string) {
+    const { data } = await supabase.from('topics').select('*').eq('chapter_id', chapterId).order('sort_order');
+    setTopics(data || []);
+  }
+
+  async function loadAvailableQuestions(topicId: string) {
+    setQuestionLoading(true);
+    const { data } = await supabase
+      .from('questions')
+      .select('id, question_text, difficulty, marks, year')
+      .eq('topic_id', topicId)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(100);
+    setAvailableQuestions((data || []) as QuestionPickerItem[]);
+    setQuestionLoading(false);
+  }
+
+  async function handleQuestionExamChange(examId: string) {
+    setQuestionExamId(examId);
+    setQuestionSubjectId('');
+    setQuestionChapterId('');
+    setQuestionTopicId('');
+    setSubjects([]);
+    setChapters([]);
+    setTopics([]);
+    setAvailableQuestions([]);
+    if (examId) await loadQuestionSubjects(examId);
+  }
+
+  async function handleQuestionSubjectChange(subjectId: string) {
+    setQuestionSubjectId(subjectId);
+    setQuestionChapterId('');
+    setQuestionTopicId('');
+    setChapters([]);
+    setTopics([]);
+    setAvailableQuestions([]);
+    if (subjectId) await loadQuestionChapters(subjectId);
+  }
+
+  async function handleQuestionChapterChange(chapterId: string) {
+    setQuestionChapterId(chapterId);
+    setQuestionTopicId('');
+    setTopics([]);
+    setAvailableQuestions([]);
+    if (chapterId) await loadQuestionTopics(chapterId);
+  }
+
+  async function handleQuestionTopicChange(topicId: string) {
+    setQuestionTopicId(topicId);
+    setAvailableQuestions([]);
+    if (topicId) await loadAvailableQuestions(topicId);
+  }
+
+  async function addQuestion(question: QuestionPickerItem) {
+    if (!questionTest || assignedQuestions.some((q) => q.question_id === question.id)) return;
+    const { error } = await supabase.from('test_questions').insert({
+      test_id: questionTest.id,
+      question_id: question.id,
+      sort_order: assignedQuestions.length + 1,
+    });
+    if (!error) await loadAssignedQuestions(questionTest.id);
+  }
+
+  async function removeQuestion(questionId: string) {
+    if (!questionTest) return;
+    const { error } = await supabase
+      .from('test_questions')
+      .delete()
+      .eq('test_id', questionTest.id)
+      .eq('question_id', questionId);
+    if (!error) await loadAssignedQuestions(questionTest.id);
   }
 
   if (loading) {
@@ -180,6 +316,11 @@ export default function TestManagementPage() {
                   <Calendar className="h-2.5 w-2.5" /> {formatDate(t.scheduled_at)}
                 </div>
               )}
+              <div className="flex justify-end mt-3 pt-3 border-t border-[var(--border)]">
+                <Button variant="secondary" size="sm" onClick={() => openQuestionManager(t)}>
+                  <ListPlus className="h-3.5 w-3.5" /> Questions
+                </Button>
+              </div>
             </Card>
           ))}
         </div>
@@ -249,6 +390,95 @@ export default function TestManagementPage() {
             <Button size="sm" onClick={handleSave} disabled={!form.title.trim()}>
               {editTest ? 'Update' : 'Create'}
             </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      {/* Question Assignment Dialog */}
+      <Dialog
+        open={questionDialogOpen}
+        onOpenChange={setQuestionDialogOpen}
+        title="Assign Questions"
+        description={questionTest ? questionTest.title : undefined}
+        className="max-w-4xl"
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+            <select value={questionExamId} onChange={(e) => handleQuestionExamChange(e.target.value)} className="text-xs rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 text-[var(--fg)] focus:ring-2 focus:ring-[var(--primary)]/40 focus:outline-none">
+              <option value="">Choose exam</option>
+              {exams.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
+            </select>
+            <select value={questionSubjectId} onChange={(e) => handleQuestionSubjectChange(e.target.value)} className="text-xs rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 text-[var(--fg)] focus:ring-2 focus:ring-[var(--primary)]/40 focus:outline-none" disabled={!questionExamId}>
+              <option value="">Choose subject</option>
+              {subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+            <select value={questionChapterId} onChange={(e) => handleQuestionChapterChange(e.target.value)} className="text-xs rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 text-[var(--fg)] focus:ring-2 focus:ring-[var(--primary)]/40 focus:outline-none" disabled={!questionSubjectId}>
+              <option value="">Choose chapter</option>
+              {chapters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+            <select value={questionTopicId} onChange={(e) => handleQuestionTopicChange(e.target.value)} className="text-xs rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 text-[var(--fg)] focus:ring-2 focus:ring-[var(--primary)]/40 focus:outline-none" disabled={!questionChapterId}>
+              <option value="">Choose topic</option>
+              {topics.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2 bg-[var(--bg-body)] border-b border-[var(--border)]">
+                <p className="text-xs font-semibold text-[var(--fg)]">Assigned</p>
+                <Badge variant="default">{assignedQuestions.length}</Badge>
+              </div>
+              <div className="max-h-80 overflow-y-auto divide-y divide-[var(--border)]">
+                {assignedQuestions.length === 0 ? (
+                  <p className="text-xs text-[var(--fg-muted)] text-center py-8">No questions assigned yet.</p>
+                ) : (
+                  assignedQuestions.map((item, idx) => (
+                    <div key={item.id} className="flex items-start gap-2 p-3">
+                      <span className="h-6 w-6 rounded-full bg-[var(--primary)]/10 text-[var(--primary)] flex items-center justify-center text-[10px] font-semibold flex-shrink-0">{idx + 1}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-[var(--fg)] line-clamp-2">{item.question?.question_text || 'Question deleted'}</p>
+                        {item.question && (
+                          <p className="text-[10px] text-[var(--fg-muted)] mt-1 capitalize">{item.question.difficulty} - {item.question.marks} marks</p>
+                        )}
+                      </div>
+                      <button onClick={() => removeQuestion(item.question_id)} className="h-7 w-7 flex items-center justify-center rounded-full text-[var(--fg-muted)] hover:text-red-500 hover:bg-red-500/10 transition-colors">
+                        <XCircle className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2 bg-[var(--bg-body)] border-b border-[var(--border)]">
+                <p className="text-xs font-semibold text-[var(--fg)]">Available Questions</p>
+                <Badge variant="default">{availableQuestions.length}</Badge>
+              </div>
+              <div className="max-h-80 overflow-y-auto divide-y divide-[var(--border)]">
+                {questionLoading ? (
+                  <p className="text-xs text-[var(--fg-muted)] text-center py-8">Loading questions...</p>
+                ) : availableQuestions.length === 0 ? (
+                  <p className="text-xs text-[var(--fg-muted)] text-center py-8">Choose a topic to add questions.</p>
+                ) : (
+                  availableQuestions.map((question) => {
+                    const isAssigned = assignedQuestions.some((item) => item.question_id === question.id);
+                    return (
+                      <div key={question.id} className="flex items-start gap-2 p-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-[var(--fg)] line-clamp-2">{question.question_text}</p>
+                          <p className="text-[10px] text-[var(--fg-muted)] mt-1 capitalize">{question.difficulty} - {question.marks} marks {question.year ? `- ${question.year}` : ''}</p>
+                        </div>
+                        <Button size="sm" variant={isAssigned ? 'secondary' : 'primary'} disabled={isAssigned} onClick={() => addQuestion(question)}>
+                          {isAssigned ? <CheckCircle className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+                          {isAssigned ? 'Added' : 'Add'}
+                        </Button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </Dialog>

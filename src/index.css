@@ -4,42 +4,45 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --color-primary-50: #e8f7fc;
-  --color-primary-100: #c8ecf7;
-  --color-primary-200: #9ddcf0;
-  --color-primary-300: #6cc3e0;
-  --color-primary-400: #4ab0d0;
-  --color-primary-500: #3a9cc0;
-  --color-primary-600: #2d84a8;
-  --color-primary-700: #236b8a;
-  --color-primary-800: #1a526b;
-  --color-primary-900: #11394d;
-  --font-sans: 'Inter', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --color-primary-50: #e7fbfa;
+  --color-primary-100: #c9f5f3;
+  --color-primary-200: #95e8e5;
+  --color-primary-300: #5ed6d2;
+  --color-primary-400: #34b6b3;
+  --color-primary-500: #0da0b8;
+  --color-primary-600: #0b8498;
+  --color-primary-700: #0b6979;
+  --color-primary-800: #0c5562;
+  --color-primary-900: #0d4651;
+  --font-sans: 'Outfit', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: 'Space Mono', source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
 }
 
 /* Light mode defaults */
 :root {
-  --bg-body: #f7f9fb;
+  --font-ui: 'Outfit', system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-numbers: 'Space Mono', source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
+  --bg-body: #f5f7f9;
   --bg-surface: #ffffff;
-  --bg-surface-hover: #f1f5f9;
-  --border: #e2e8f0;
-  --border-strong: #cbd5e1;
-  --fg: #0f172a;
-  --fg-muted: #64748b;
-  --fg-subtle: #94a3b8;
-  --primary: #6CC3E0;
-  --primary-hover: #4ab0d0;
-  --primary-active: #3a9cc0;
+  --bg-surface-hover: #f0f4f8;
+  --border: #dee4e9;
+  --border-strong: #cbd5df;
+  --fg: #1a2f3c;
+  --fg-muted: #596d7b;
+  --fg-subtle: #9ca3af;
+  --primary: #34b6b3;
+  --primary-hover: #0da0b8;
+  --primary-active: #0b8498;
   --primary-fg: #ffffff;
-  --primary-light: rgba(108, 195, 224, 0.1);
-  --primary-ring: rgba(108, 195, 224, 0.4);
-  --danger: #dc2626;
-  --danger-hover: #b91c1c;
-  --success: #16a34a;
-  --warning: #d97706;
-  --ring: rgba(108, 195, 224, 0.4);
-  --shadow: rgba(0, 0, 0, 0.06);
-  --shadow-md: rgba(0, 0, 0, 0.1);
+  --primary-light: rgba(52, 182, 179, 0.1);
+  --primary-ring: rgba(52, 182, 179, 0.2);
+  --danger: #ef4444;
+  --danger-hover: #dc2626;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --ring: rgba(52, 182, 179, 0.2);
+  --shadow: rgba(0, 0, 0, 0.05);
+  --shadow-md: rgba(0, 0, 0, 0.07);
   --overlay: rgba(0, 0, 0, 0.4);
   --glass-bg: rgba(255, 255, 255, 0.8);
   --glass-border: rgba(255, 255, 255, 0.3);
@@ -48,20 +51,20 @@
 
 /* Dark mode */
 .dark {
-  --bg-body: #0b0f19;
-  --bg-surface: #131a2b;
-  --bg-surface-hover: #1a2236;
-  --border: #1c2537;
-  --border-strong: #2a3654;
-  --fg: #e8edf3;
-  --fg-muted: #8b9ab5;
-  --fg-subtle: #5e6e8a;
-  --primary: #6CC3E0;
-  --primary-hover: #9ddcf0;
-  --primary-active: #c8ecf7;
-  --primary-fg: #0b0f19;
-  --primary-light: rgba(108, 195, 224, 0.08);
-  --primary-ring: rgba(108, 195, 224, 0.3);
+  --bg-body: #0d151b;
+  --bg-surface: #12202a;
+  --bg-surface-hover: #1a2b36;
+  --border: #263944;
+  --border-strong: #36515f;
+  --fg: #eef6f7;
+  --fg-muted: #a7b7bf;
+  --fg-subtle: #748993;
+  --primary: #34b6b3;
+  --primary-hover: #5ed6d2;
+  --primary-active: #95e8e5;
+  --primary-fg: #071114;
+  --primary-light: rgba(52, 182, 179, 0.08);
+  --primary-ring: rgba(52, 182, 179, 0.24);
   --danger: #ef4444;
   --danger-hover: #dc2626;
   --success: #22c55e;
@@ -77,12 +80,12 @@
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--border-strong) transparent;
+  scrollbar-color: rgba(52, 182, 179, 0.52) transparent;
 }
 
 *::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 *::-webkit-scrollbar-track {
@@ -91,12 +94,15 @@
 }
 
 *::-webkit-scrollbar-thumb {
-  background: var(--border-strong);
-  border-radius: 9999px;
+  background: rgba(52, 182, 179, 0.52);
+  border-radius: 10px;
+  border: 1px solid #f6f6f6;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: var(--fg-subtle);
+  background: var(--primary);
+  border-radius: 15px;
+  border: none;
 }
 
 html, body, #root {
@@ -107,7 +113,7 @@ html, body, #root {
 }
 
 body {
-  font-family: var(--font-sans);
+  font-family: var(--font-ui);
   background-color: var(--bg-body);
   color: var(--fg);
   -webkit-font-smoothing: antialiased;
@@ -116,12 +122,21 @@ body {
   line-height: 1.5;
 }
 
+::selection {
+  background-color: var(--primary);
+  color: #ffffff;
+}
+
+.font-numbers {
+  font-family: var(--font-numbers);
+}
+
 /* Focus ring utility */
 .focus-ring {
   outline: none;
 }
 .focus-ring:focus-visible {
-  box-shadow: 0 0 0 2px var(--bg-body), 0 0 0 4px var(--ring);
+  box-shadow: 0 0 0 3px var(--ring);
 }
 
 /* Glass effect */

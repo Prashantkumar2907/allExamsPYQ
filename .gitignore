@@ -4,4 +4,9 @@ dist/
 .env.local
 .env.*.local
 *.tsbuildinfo
+local/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+supabase/.temp/
 .DS_Store

@@ -103,7 +103,14 @@ export default function TestListPage() {
       .order('sort_order');
 
     const questionIds = tqs?.map((q) => q.question_id) ?? [];
-    if (questionIds.length === 0) return;
+    if (questionIds.length === 0) {
+      window.alert('This test does not have questions assigned yet.');
+      return;
+    }
+
+    const attemptQuestionIds = test.shuffle_questions
+      ? [...questionIds].sort(() => Math.random() - 0.5)
+      : questionIds;
 
     const { data: attempt } = await supabase
       .from('test_attempts')
@@ -113,7 +120,7 @@ export default function TestListPage() {
         source_type: 'test' as const,
         source_id: test.id,
         source_name: test.title,
-        total_questions: questionIds.length,
+        total_questions: attemptQuestionIds.length,
         total_marks: test.total_marks,
         duration_minutes: test.duration_minutes,
         status: 'in_progress' as const,
@@ -123,7 +130,7 @@ export default function TestListPage() {
 
     if (attempt) {
       await supabase.from('user_answers').insert(
-        questionIds.map((qid) => ({
+        attemptQuestionIds.map((qid) => ({
           attempt_id: attempt.id,
           question_id: qid,
           time_spent_seconds: 0,
@@ -148,8 +155,23 @@ export default function TestListPage() {
 
   const totalPages = Math.ceil(historyTotal / HISTORY_PER_PAGE);
 
+  function getAvailability(test: Test) {
+    const now = Date.now();
+    const opensAt = test.scheduled_at ? new Date(test.scheduled_at).getTime() : null;
+    const closesAt = test.scheduled_end_at ? new Date(test.scheduled_end_at).getTime() : null;
+
+    if (opensAt && now < opensAt) {
+      return { available: false, label: `Opens ${formatDate(test.scheduled_at!)}` };
+    }
+    if (closesAt && now > closesAt) {
+      return { available: false, label: 'Closed' };
+    }
+    return { available: true, label: 'Start' };
+  }
+
   const renderTestCard = (test: Test) => {
     const isCompleted = completedTestIds.has(test.id);
+    const availability = getAvailability(test);
     return (
       <Card key={test.id} className="hover:border-[var(--border-strong)] transition-all duration-150">
         <div className="flex items-start justify-between gap-3">
@@ -164,7 +186,9 @@ export default function TestListPage() {
           {isCompleted ? (
             <Badge variant="success"><CheckCircle className="h-3 w-3 mr-0.5" />Done</Badge>
           ) : (
-            <Button size="sm" onClick={() => startTest(test)}><Play className="h-3.5 w-3.5" /> Start</Button>
+            <Button size="sm" onClick={() => startTest(test)} disabled={!availability.available}>
+              <Play className="h-3.5 w-3.5" /> {availability.label}
+            </Button>
           )}
         </div>
       </Card>
