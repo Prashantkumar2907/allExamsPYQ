@@ -70,3 +70,17 @@ Admin account:
 - The only warning was the intentional demo-mode Supabase env warning.
 - Direct local Supabase was not tested because Docker is unavailable on this machine.
 - Native install prompts depend on browser installability checks. The iOS guidance path is rendered by device detection, while Chromium install action appears after `beforeinstallprompt`.
+
+## 2026-05-09 privacy, UI, and architecture checks
+
+- Verified `npm run build`.
+- Verified `npm run db:sqlite`; regenerated `local/demo.sqlite`.
+- Verified `npm audit --audit-level=moderate` returned zero vulnerabilities.
+- Verified `git diff --check`.
+- Re-scanned source for native `window.alert`, `window.confirm`, `alert(...)`, `console.error`, `any`, non-ASCII visible UI text, `rounded-2xl`, blurred orb backgrounds, and direct student leaderboard profile joins. The scans returned no matches.
+- Smoke checked the running Vite app at `http://127.0.0.1:3001`.
+- Browser login as `demoaccount@allexamspyq.local` passed and landed on `/dashboard`.
+- Browser leaderboard route loaded through the sanitized `get_leaderboard` RPC with no error state and no console errors.
+- Browser bookmarks route loaded saved question content with no error state and no console errors.
+- In-app screenshot capture timed out during the final visual capture attempt; DOM snapshots and browser console checks passed.
+- Did not run Supabase locally because Docker remains unavailable in this environment.

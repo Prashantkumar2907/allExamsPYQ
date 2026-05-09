@@ -1,6 +1,6 @@
 # allExamsPYQ Product Understanding
 
-Date: 2026-05-08
+Date: 2026-05-09
 
 ## Core Value Proposition
 
@@ -21,6 +21,7 @@ allExamsPYQ is a previous-year-question practice platform for competitive exam p
 - Student workflows: `src/pages/student/*`
 - Admin workflows: `src/pages/admin/*`
 - Supabase schema, RLS, constraints, and indexes: `supabase/migrations/202605080001_initial_schema.sql`
+- Privacy/index follow-up migration: `supabase/migrations/202605090001_privacy_and_index_hardening.sql`
 - Supabase seed and local docs: `supabase/seed.sql`, `supabase/README.md`
 - Local fixture generator: `scripts/create-demo-sqlite.mjs`
 
@@ -102,3 +103,41 @@ This pass should prioritize a small set of improvements with high leverage:
 - Replaced the student practice-start native alert with toasts, per-item loading states, and keyboard-accessible subject/chapter cards.
 - Removed remaining `any` usage from high-value admin dashboard/import/test-management flows.
 - Added accessibility labels to menu, sheet, toast, avatar, option-selection, and syllabus action controls.
+
+## 2026-05-09 Deep Audit Addendum
+
+### Ten-Pass Discovery Map
+
+1. Repository and git topology: app root is `allExamsPYQ`, with its own Git repo and `origin` remote.
+2. Runtime stack: Vite, React 19, TypeScript, Tailwind CSS v4, Zustand, Radix, Lucide, Supabase.
+3. Entrypoints: `src/main.tsx` renders `src/App.tsx`; `vite.config.ts` defines aliases and production chunks.
+4. Routing: `src/App.tsx` owns guest, authenticated, student, and admin route guards.
+5. Auth: `src/stores/authStore.ts` initializes from Supabase auth, loads `profiles`, and gates role redirects.
+6. Data access: pages call the exported `supabase` client directly; demo mode is mirrored in `src/lib/demoSupabase.ts`.
+7. Database: migrations define Postgres tables, RLS, helper functions, triggers, constraints, and indexes.
+8. UI primitives: shared controls live in `src/components/ui`; loading, empty, and error states live in `src/components/shared`.
+9. Student workflows: dashboards, exam browser, tests, results, bookmarks, analytics, leaderboard, and profile live in `src/pages/student`.
+10. Admin workflows: content hierarchy, question bank, test management, reports, bulk upload, users, and profile live in `src/pages/admin`.
+
+### Additional Findings
+
+- Student leaderboard previously required broad `profiles` reads to join display names and avatars. That exposed profile rows more widely than needed.
+- The auth store persisted Supabase session-shaped data in its own `auth-storage` key, duplicating token-bearing session data outside Supabase's client storage.
+- Shared input/select/textarea primitives needed stronger label and error semantics for consistent accessibility.
+- The route transition wrapper animated only on first mount because it was not keyed by location.
+- Several visible strings used non-ASCII glyphs or mojibake-prone characters in compact UI labels.
+- Some remaining FK-backed paths lacked explicit indexes for delete checks, report review, user-answer option references, and test-question reverse lookups.
+
+### Implemented On 2026-05-09
+
+- Added `get_leaderboard()` as a security-definer RPC that returns only leaderboard-safe profile fields.
+- Restricted `profiles` select policy to the current user or admins; leaderboard no longer depends on direct profile joins.
+- Added indexes for profile exam lookups, test attempts by test, reverse test-question lookups, report review joins, syllabus topic checks, and selected answer option references.
+- Removed Zustand `persist` from auth state and clear the legacy `auth-storage` key during initialization.
+- Mirrored `get_leaderboard()` in the demo Supabase adapter.
+- Added leaderboard page error handling with retry.
+- Improved Button, Input, Textarea, Select, Card, Avatar, EmptyState, Pagination, and PWA prompt primitives.
+- Keyed route content by pathname so route transitions replay correctly.
+- Added bookmark page error state, mutation feedback, keyboard access for bookmark rows, and safer delete/note handling.
+- Added optional report details to question reports so admins receive better triage context.
+- Cleaned visible non-ASCII UI text and removed decorative blurred orb backgrounds from auth/landing/profile surfaces.

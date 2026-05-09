@@ -27,6 +27,7 @@ Use this before changing Supabase queries, migrations, demo data, or fixtures.
   - `bookmarks.user_id + created_at`
 - If adding a Supabase `.rpc(...)` call, add a matching method to `src/lib/demoSupabase.ts` or demo mode will fail at runtime.
 - If adding tables or fields, update all three surfaces: migration, `src/types/database.ts`, and demo data/adapter if the UI touches it.
+- Do not join `profiles` directly for student-visible public display data. Use sanitized RPCs that expose only approved fields.
 
 ## Atomic Leaderboard Updates
 
@@ -44,9 +45,23 @@ await supabase.rpc('record_leaderboard_attempt', {
 
 Do not reintroduce browser-side leaderboard read-modify-write; concurrent submissions can lose increments.
 
+## Sanitized Leaderboard Reads
+
+Leaderboard reads should call:
+
+```ts
+await supabase.rpc('get_leaderboard', {
+  p_exam_id: profile.exam_id,
+  p_limit: 50,
+});
+```
+
+The RPC returns `id`, `user_id`, score fields, `full_name`, and `avatar_url`. It avoids broad student reads on `profiles`, so do not replace it with `.select('*, profile:profiles(...)')`.
+
 ## Migration Rules
 
 - Keep `public.is_admin()` as a `security definer` helper to avoid recursive RLS checks on `profiles`.
 - New text fields that are required should usually include `check (length(btrim(field)) > 0)`.
 - New numeric score/count fields should include non-negative checks.
 - Use `on delete cascade` for dependent content and `on delete restrict` for question references that should preserve attempt history.
+- Every FK that is used for joins, delete checks, or filtered admin review should have an explicit index unless it is already the leading column of a unique or composite index.

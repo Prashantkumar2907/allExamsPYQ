@@ -171,7 +171,7 @@ Used by both student and admin roles.
 
 | # | Table | Op | Query | Description |
 |---|-------|----|-------|-------------|
-| 37 | `leaderboard_scores` | SELECT | `.select('*, profile:profiles(full_name, avatar_url)').eq('exam_id', examId).order('total_score', { ascending: false }).limit(50)` | Load top 50 leaderboard entries with profile data |
+| 37 | `get_leaderboard` | RPC | `.rpc('get_leaderboard', { p_exam_id: examId, p_limit: 50 })` | Load top 50 leaderboard entries with sanitized profile display fields |
 
 ### Profile (`src/pages/student/ProfilePage.tsx`)
 
@@ -287,8 +287,8 @@ Used by both student and admin roles.
 | `reported_questions` | 1 | 1 | 1 | — | — |
 | `syllabus_progress` | 1 | — | — | — | — |
 
-**Total: 97 Supabase calls** (5 auth + 92 data queries) across 14 files.  
-**No RPC calls or Storage calls used.**
+**Total: 97+ Supabase calls** (5 auth + data queries/RPCs) across app files.
+**RPC calls used:** `record_leaderboard_attempt`, `get_leaderboard`. Storage calls are not used.
 
 ---
 
