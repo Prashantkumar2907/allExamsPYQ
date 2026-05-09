@@ -8,11 +8,12 @@ interface DialogProps {
   onOpenChange: (open: boolean) => void;
   title: string;
   description?: string;
+  hideDescription?: boolean;
   children: ReactNode;
   className?: string;
 }
 
-export function Dialog({ open, onOpenChange, title, description, children, className }: DialogProps) {
+export function Dialog({ open, onOpenChange, title, description, hideDescription = false, children, className }: DialogProps) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
@@ -28,11 +29,9 @@ export function Dialog({ open, onOpenChange, title, description, children, class
               <DialogPrimitive.Title className="text-sm font-semibold text-[var(--fg)]">
                 {title}
               </DialogPrimitive.Title>
-              {description && (
-                <DialogPrimitive.Description className="text-xs text-[var(--fg-muted)] mt-0.5">
-                  {description}
-                </DialogPrimitive.Description>
-              )}
+              <DialogPrimitive.Description className={description && !hideDescription ? 'text-xs text-[var(--fg-muted)] mt-0.5' : 'sr-only'}>
+                {description ?? `${title} dialog`}
+              </DialogPrimitive.Description>
             </div>
             <DialogPrimitive.Close
               className="h-7 w-7 inline-flex items-center justify-center rounded-md text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-surface-hover)] transition-colors duration-150 focus-ring"

@@ -79,7 +79,7 @@ export default function ProfilePage() {
               onClick={() => setAvatarStyle(style)}
               aria-label={`Use ${style} avatar style`}
               className={cn(
-                'relative rounded-xl border-2 p-1 transition-all',
+                'relative rounded-xl border-2 p-1 transition',
                 avatarStyle === style
                   ? 'border-[var(--primary)] ring-2 ring-[var(--primary)]/30 scale-105'
                   : 'border-transparent hover:border-[var(--border)]'

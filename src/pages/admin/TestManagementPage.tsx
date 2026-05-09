@@ -377,7 +377,7 @@ export default function TestManagementPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {tests.map((t) => (
-            <Card key={t.id} className="group hover:-translate-y-[1px] hover:shadow-md transition-all">
+            <Card key={t.id} className="group hover:-translate-y-[1px] hover:shadow-md transition">
               <div className="flex items-start justify-between gap-2 mb-2">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-[var(--fg)] truncate">{t.title}</p>

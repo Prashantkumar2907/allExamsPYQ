@@ -19,7 +19,7 @@ export default function RegisterPage() {
   const [examId, setExamId] = useState('');
   const [exams, setExams] = useState<Exam[]>([]);
   const [error, setError] = useState('');
-  const { signUp, loading } = useAuthStore();
+  const { signUp, submitting } = useAuthStore();
   const { toggleTheme, resolvedTheme } = useThemeStore();
   const isDark = resolvedTheme() === 'dark';
   const navigate = useNavigate();
@@ -176,12 +176,12 @@ export default function RegisterPage() {
             </div>
 
             {error && (
-              <div className="text-xs text-[var(--danger)] bg-[var(--danger)]/10 px-3 py-2 rounded-lg animate-fade-in">
+              <div className="text-xs text-[var(--danger)] bg-[var(--danger)]/10 px-3 py-2 rounded-lg animate-fade-in" role="alert" aria-live="polite">
                 {error}
               </div>
             )}
 
-            <Button type="submit" className="w-full" size="lg" loading={loading}>
+            <Button type="submit" className="w-full" size="lg" loading={submitting}>
               Create Account
             </Button>
           </form>

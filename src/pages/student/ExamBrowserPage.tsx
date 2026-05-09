@@ -264,7 +264,7 @@ export default function ExamBrowserPage() {
           subjects.map((s) => (
             <Card
               key={s.id}
-              className="cursor-pointer hover:translate-y-[-2px] hover:shadow-lg transition-all duration-200 group"
+              className="cursor-pointer hover:translate-y-[-2px] hover:shadow-lg transition duration-200 group"
               onClick={() => selectSubject(s)}
               onKeyDown={(event) => handleCardKey(event, () => selectSubject(s))}
               role="button"
@@ -293,7 +293,7 @@ export default function ExamBrowserPage() {
                   >
                     <Play className="h-3 w-3" /> Practice
                   </Button>
-                  <ChevronRight className="h-4 w-4 text-[var(--fg-muted)] group-hover:text-[var(--primary)] group-hover:translate-x-0.5 transition-all" />
+                  <ChevronRight className="h-4 w-4 text-[var(--fg-muted)] group-hover:text-[var(--primary)] group-hover:translate-x-0.5 transition" />
                 </div>
               </div>
             </Card>
@@ -303,7 +303,7 @@ export default function ExamBrowserPage() {
           chapters.map((c) => (
             <Card
               key={c.id}
-              className="cursor-pointer hover:translate-y-[-2px] hover:shadow-lg transition-all duration-200 group"
+              className="cursor-pointer hover:translate-y-[-2px] hover:shadow-lg transition duration-200 group"
               onClick={() => selectChapter(c)}
               onKeyDown={(event) => handleCardKey(event, () => selectChapter(c))}
               role="button"
@@ -329,7 +329,7 @@ export default function ExamBrowserPage() {
                   >
                     <Play className="h-3 w-3" /> Practice
                   </Button>
-                  <ChevronRight className="h-4 w-4 text-[var(--fg-muted)] group-hover:text-[var(--primary)] group-hover:translate-x-0.5 transition-all" />
+                  <ChevronRight className="h-4 w-4 text-[var(--fg-muted)] group-hover:text-[var(--primary)] group-hover:translate-x-0.5 transition" />
                 </div>
               </div>
             </Card>
@@ -339,7 +339,7 @@ export default function ExamBrowserPage() {
           topics.map((t) => (
             <Card
               key={t.id}
-              className="hover:translate-y-[-2px] hover:shadow-lg transition-all duration-200 group"
+              className="hover:translate-y-[-2px] hover:shadow-lg transition duration-200 group"
             >
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-xl bg-green-500/10 flex items-center justify-center flex-shrink-0 group-hover:bg-green-500/15 transition-colors">

@@ -230,7 +230,7 @@ const sampleRow = ['JEE Main', 'Physics', 'Mechanics', 'Newton Laws', 'What is N
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
           className={cn(
-            'flex flex-col items-center justify-center gap-3 py-8 border-2 border-dashed rounded-xl transition-all',
+            'flex flex-col items-center justify-center gap-3 py-8 border-2 border-dashed rounded-xl transition',
             dragOver ? 'border-[var(--primary)] bg-[var(--primary)]/5 scale-[1.01]' : 'border-[var(--border)] hover:border-[var(--fg-muted)]'
           )}
         >

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { APP_NAME } from '../../lib/constants';
@@ -53,14 +53,26 @@ export function Sidebar({ open, onClose }: SidebarProps) {
   const { profile, signOut } = useAuthStore();
   const location = useLocation();
   const [signingOut, setSigningOut] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const isAdmin = profile?.role === 'admin';
   const nav = isAdmin ? adminNav : studentNav;
+  const closedOnMobile = isMobile && !open;
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 1023px)');
+    const updateIsMobile = () => setIsMobile(mediaQuery.matches);
+    updateIsMobile();
+    mediaQuery.addEventListener('change', updateIsMobile);
+    return () => mediaQuery.removeEventListener('change', updateIsMobile);
+  }, []);
 
   return (
     <aside
+      aria-hidden={closedOnMobile || undefined}
+      inert={closedOnMobile || undefined}
       className={cn(
         'fixed lg:static inset-y-0 left-0 z-40 w-60 flex flex-col bg-[var(--bg-surface)] border-r border-[var(--border)] transition-transform duration-200 ease-out',
-        open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0 pointer-events-none lg:pointer-events-auto'
       )}
     >
       {/* Logo */}
@@ -95,7 +107,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
               to={item.to}
               onClick={onClose}
               className={cn(
-                'relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition-all duration-150 cursor-pointer',
+                'relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-medium transition duration-150 cursor-pointer',
                 isActive
                   ? 'bg-[var(--primary)]/10 text-[var(--primary)]'
                   : 'text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-surface-hover)]'

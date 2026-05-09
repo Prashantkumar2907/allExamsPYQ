@@ -207,7 +207,7 @@ export default function TestListPage() {
     const isCompleted = completedTestIds.has(test.id);
     const availability = getAvailability(test);
     return (
-      <Card key={test.id} className="hover:border-[var(--border-strong)] transition-all duration-150">
+      <Card key={test.id} className="hover:border-[var(--border-strong)] transition duration-150">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-[var(--fg)] truncate">{test.title}</p>
@@ -284,7 +284,7 @@ export default function TestListPage() {
                   <div
                     key={att.id}
                     onClick={() => navigate(`/result/${att.id}`)}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-surface-hover)] transition-all duration-150 cursor-pointer group"
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-surface-hover)] transition duration-150 cursor-pointer group"
                   >
                     {/* Score circle */}
                     <div className={cn(

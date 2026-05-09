@@ -361,7 +361,7 @@ export default function TestResultPage() {
             onChange={(e) => setBookmarkNote(e.target.value)}
             rows={3}
             placeholder="Add a note (optional)..."
-            className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--bg-body)] text-[var(--fg)] placeholder:text-[var(--fg-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30 focus:border-[var(--primary)]/50 transition-all resize-none"
+            className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--bg-body)] text-[var(--fg)] placeholder:text-[var(--fg-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30 focus:border-[var(--primary)]/50 transition resize-none"
           />
           <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
             <Button variant="secondary" size="sm" onClick={() => setBookmarkDialogOpen(false)}>Cancel</Button>

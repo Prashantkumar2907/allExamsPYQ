@@ -277,6 +277,16 @@ export default function QuestionManagementPage() {
     );
   }
   if (error) return <ErrorState description={error} onRetry={loadExams} />;
+  const canCreateQuestion = Boolean(filterTopic);
+  const createHelpText = !filterExam
+    ? 'Select an exam, subject, chapter, and topic before adding a question.'
+    : !filterSubject
+    ? 'Select a subject, chapter, and topic before adding a question.'
+    : !filterChapter
+    ? 'Select a chapter and topic before adding a question.'
+    : !filterTopic
+    ? 'Select a topic before adding a question.'
+    : '';
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -285,9 +295,22 @@ export default function QuestionManagementPage() {
           <h1 className="text-xl font-bold text-[var(--fg)] sm:text-2xl">Questions</h1>
           <p className="text-xs text-[var(--fg-muted)] sm:hidden">{questionTotal} questions in the current view</p>
         </div>
-        <Button size="sm" onClick={openCreate} disabled={!filterTopic} className="w-full sm:w-auto">
-          <Plus className="h-3.5 w-3.5 mr-1" /> Add Question
-        </Button>
+        <div className="w-full sm:w-auto sm:text-right">
+          <Button
+            size="sm"
+            onClick={openCreate}
+            disabled={!canCreateQuestion}
+            className="w-full sm:w-auto"
+            aria-describedby={!canCreateQuestion ? 'add-question-help' : undefined}
+          >
+            <Plus className="h-3.5 w-3.5 mr-1" /> Add Question
+          </Button>
+          {!canCreateQuestion && (
+            <p id="add-question-help" className="mt-1 text-[11px] text-[var(--fg-muted)]">
+              {createHelpText}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -331,7 +354,7 @@ export default function QuestionManagementPage() {
           <>
             <div className="space-y-2 pt-3">
               {questions.map((q) => (
-                <div key={q.id} className="group flex flex-col gap-3 rounded-xl border border-transparent bg-[var(--bg-body)] p-3 transition-all hover:border-[var(--border)] hover:bg-[var(--bg-surface-hover)] sm:flex-row sm:items-start sm:justify-between">
+                <div key={q.id} className="group flex flex-col gap-3 rounded-xl border border-transparent bg-[var(--bg-body)] p-3 transition hover:border-[var(--border)] hover:bg-[var(--bg-surface-hover)] sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0 flex-1">
                     <p className="mb-1 line-clamp-2 text-sm font-medium leading-snug text-[var(--fg)]">{q.question_text}</p>
                     <div className="flex flex-wrap items-center gap-2">

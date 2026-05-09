@@ -211,7 +211,7 @@ export default function ProfilePage() {
             {recentBookmarks.map((bm) => {
               const q = bm.question;
               return (
-                <Card key={bm.id} className="cursor-pointer group hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--primary)]/30 transition-all duration-200" onClick={() => setSelectedBookmark(bm)}>
+                <Card key={bm.id} className="cursor-pointer group hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--primary)]/30 transition duration-200" onClick={() => setSelectedBookmark(bm)}>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Badge variant={q?.difficulty === 'easy' ? 'success' : q?.difficulty === 'hard' ? 'danger' : 'warning'} className="text-[10px]">{q?.difficulty}</Badge>
@@ -274,7 +274,7 @@ export default function ProfilePage() {
                       key={style}
                       onClick={() => setTempAvatarStyle(style)}
                       aria-label={`Use ${style} avatar style`}
-                      className={cn('relative rounded-xl border-2 p-2 transition-all duration-200 cursor-pointer', tempAvatarStyle === style ? 'border-[var(--primary)] bg-[var(--primary)]/5 scale-105 shadow-md' : 'border-transparent hover:border-[var(--border)] hover:bg-[var(--bg-surface-hover)]')}
+                      className={cn('relative rounded-xl border-2 p-2 transition duration-200 cursor-pointer', tempAvatarStyle === style ? 'border-[var(--primary)] bg-[var(--primary)]/5 scale-105 shadow-md' : 'border-transparent hover:border-[var(--border)] hover:bg-[var(--bg-surface-hover)]')}
                     >
                 <img src={getAvatarUrl(style, profile.full_name)} alt={style} className="h-14 w-14 rounded-lg mx-auto" />
                 {tempAvatarStyle === style && <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[var(--primary)] flex items-center justify-center shadow-sm"><CheckCircle className="h-3 w-3 text-white" /></div>}

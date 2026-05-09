@@ -24,7 +24,7 @@ export function ConfirmDialog({
   variant = 'danger',
 }: ConfirmDialogProps) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} title={title}>
+    <Dialog open={open} onOpenChange={onOpenChange} title={title} description={description} hideDescription>
       <div className="space-y-4">
         <div className="flex items-start gap-3">
           <div className="h-10 w-10 rounded-xl bg-[var(--danger)]/10 flex items-center justify-center flex-shrink-0">

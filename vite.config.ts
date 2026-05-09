@@ -14,6 +14,11 @@ export default defineConfig({
     port: 3000,
   },
   build: {
+    modulePreload: {
+      resolveDependencies(_url, deps) {
+        return deps.filter((dep) => !dep.includes('charts-'));
+      },
+    },
     rollupOptions: {
       output: {
         manualChunks(id) {

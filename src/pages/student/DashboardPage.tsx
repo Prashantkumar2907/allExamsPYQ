@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { usePageStore } from '../../stores/pageStore';
@@ -8,8 +8,8 @@ import { ErrorState } from '../../components/shared/ErrorState';
 import { Card, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { getErrorMessage } from '../../lib/api';
-import { cn, getAccuracy, getScorePercentage, formatDate, formatTime } from '../../lib/utils';
 import { CHART_COLORS } from '../../lib/constants';
+import { cn, getAccuracy, getScorePercentage, formatDate } from '../../lib/utils';
 import {
   ClipboardCheck,
   Target,
@@ -18,20 +18,33 @@ import {
   BookOpen,
   ArrowRight,
   CheckCircle,
-  History,
 } from 'lucide-react';
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-} from 'recharts';
 import type { TestAttempt, SyllabusProgress } from '../../types/database';
+
+type DashboardAttempt = Pick<
+  TestAttempt,
+  | 'id'
+  | 'source_name'
+  | 'score'
+  | 'total_marks'
+  | 'correct_answers'
+  | 'wrong_answers'
+  | 'skipped'
+  | 'total_questions'
+  | 'completed_at'
+  | 'started_at'
+>;
+
+const StudentTrendChart = lazy(() =>
+  import('../../components/charts/DashboardCharts').then((module) => ({ default: module.StudentTrendChart }))
+);
+const StudentQuestionStatusChart = lazy(() =>
+  import('../../components/charts/DashboardCharts').then((module) => ({ default: module.StudentQuestionStatusChart }))
+);
+
+function ChartFallback({ className = 'h-full' }: { className?: string }) {
+  return <div className={`${className} rounded-lg animate-shimmer`} />;
+}
 
 export default function DashboardPage() {
   const { profile } = useAuthStore();
@@ -39,7 +52,7 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [attempts, setAttempts] = useState<TestAttempt[]>([]);
+  const [attempts, setAttempts] = useState<DashboardAttempt[]>([]);
   const [syllabusProgress, setSyllabusProgress] = useState<SyllabusProgress[]>([]);
   const [totalTopics, setTotalTopics] = useState(0);
   const [nextTest, setNextTest] = useState<{ title: string; scheduled_at: string } | null>(null);
@@ -57,7 +70,7 @@ export default function DashboardPage() {
     const [attRes, sylRes, topRes, testRes] = await Promise.all([
       supabase
         .from('test_attempts')
-        .select('*')
+        .select('id, source_name, score, total_marks, correct_answers, wrong_answers, skipped, total_questions, completed_at, started_at')
         .eq('user_id', profile!.id)
         .eq('status', 'completed')
         .order('completed_at', { ascending: false }),
@@ -197,28 +210,9 @@ export default function DashboardPage() {
           </CardHeader>
           {trendData.length > 1 ? (
             <div className="h-52">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={trendData}>
-                  <defs>
-                    <linearGradient id="scoreFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={CHART_COLORS[0]} stopOpacity={0.3} />
-                      <stop offset="100%" stopColor={CHART_COLORS[0]} stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} axisLine={false} tickLine={false} domain={[0, 100]} />
-                  <Tooltip
-                    contentStyle={{
-                      background: 'var(--bg-surface)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 8,
-                      fontSize: 12,
-                    }}
-                  />
-                  <Area type="monotone" dataKey="score" stroke={CHART_COLORS[0]} fill="url(#scoreFill)" strokeWidth={2} />
-                  <Area type="monotone" dataKey="accuracy" stroke={CHART_COLORS[2]} fill="none" strokeWidth={1.5} strokeDasharray="4 4" />
-                </AreaChart>
-              </ResponsiveContainer>
+              <Suspense fallback={<ChartFallback />}>
+                <StudentTrendChart data={trendData} />
+              </Suspense>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -238,23 +232,9 @@ export default function DashboardPage() {
           </CardHeader>
           {pieData.length > 0 ? (
             <div className="h-48 flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={40} outerRadius={60} dataKey="value" paddingAngle={3} strokeWidth={0}>
-                    {pieData.map((_, i) => (
-                      <Cell key={i} fill={[CHART_COLORS[0], '#d45a5a', CHART_COLORS[3]][i]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      background: 'var(--bg-surface)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 8,
-                      fontSize: 12,
-                    }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              <Suspense fallback={<ChartFallback />}>
+                <StudentQuestionStatusChart data={pieData} />
+              </Suspense>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -315,7 +295,7 @@ export default function DashboardPage() {
         <p className="text-xs font-semibold text-[var(--fg-muted)] uppercase tracking-wider mb-3">Quick Actions</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {nextTest && (
-            <Card className="group cursor-pointer hover:translate-y-[-2px] hover:shadow-lg transition-all duration-200">
+            <Card className="group cursor-pointer hover:translate-y-[-2px] hover:shadow-lg transition duration-200">
               <div className="flex items-center gap-3.5">
                 <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-500/5 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
                   <Clock className="h-5 w-5 text-amber-500" />
@@ -328,7 +308,7 @@ export default function DashboardPage() {
             </Card>
           )}
           <Card
-            className="group cursor-pointer hover:translate-y-[-2px] hover:shadow-lg transition-all duration-200"
+            className="group cursor-pointer hover:translate-y-[-2px] hover:shadow-lg transition duration-200"
             onClick={() => navigate('/exams')}
           >
             <div className="flex items-center gap-3.5">
@@ -339,11 +319,11 @@ export default function DashboardPage() {
                 <p className="text-sm font-medium text-[var(--fg)]">Browse Exams</p>
                 <p className="text-[11px] text-[var(--fg-muted)]">Explore subjects & topics</p>
               </div>
-              <ArrowRight className="h-4 w-4 text-[var(--fg-muted)] group-hover:text-[var(--primary)] group-hover:translate-x-0.5 transition-all" />
+              <ArrowRight className="h-4 w-4 text-[var(--fg-muted)] group-hover:text-[var(--primary)] group-hover:translate-x-0.5 transition" />
             </div>
           </Card>
           <Card
-            className="group cursor-pointer hover:translate-y-[-2px] hover:shadow-lg transition-all duration-200"
+            className="group cursor-pointer hover:translate-y-[-2px] hover:shadow-lg transition duration-200"
             onClick={() => navigate('/tests')}
           >
             <div className="flex items-center gap-3.5">
@@ -354,7 +334,7 @@ export default function DashboardPage() {
                 <p className="text-sm font-medium text-[var(--fg)]">Take a Test</p>
                 <p className="text-[11px] text-[var(--fg-muted)]">Start a practice or mock test</p>
               </div>
-              <ArrowRight className="h-4 w-4 text-[var(--fg-muted)] group-hover:text-[var(--primary)] group-hover:translate-x-0.5 transition-all" />
+              <ArrowRight className="h-4 w-4 text-[var(--fg-muted)] group-hover:text-[var(--primary)] group-hover:translate-x-0.5 transition" />
             </div>
           </Card>
         </div>

@@ -29,11 +29,9 @@ export function Sheet({ open, onOpenChange, title, description, children, classN
               <DialogPrimitive.Title className="text-sm font-semibold text-[var(--fg)] truncate">
                 {title}
               </DialogPrimitive.Title>
-              {description && (
-                <DialogPrimitive.Description className="text-xs text-[var(--fg-muted)] mt-0.5 truncate">
-                  {description}
-                </DialogPrimitive.Description>
-              )}
+              <DialogPrimitive.Description className={description ? 'text-xs text-[var(--fg-muted)] mt-0.5 truncate' : 'sr-only'}>
+                {description ?? `${title} panel`}
+              </DialogPrimitive.Description>
             </div>
             <DialogPrimitive.Close
               className="ml-2 h-7 w-7 inline-flex items-center justify-center rounded-md text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-surface-hover)] transition-colors duration-150 flex-shrink-0 focus-ring"

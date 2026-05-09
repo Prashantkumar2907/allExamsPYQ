@@ -223,7 +223,7 @@ export default function ExamManagementPage() {
           <div
             key={item.id}
             className={cn(
-              'flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer transition-all duration-150 group',
+              'flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer transition duration-150 group',
               selectedId === item.id
                 ? 'bg-[var(--primary)]/10 text-[var(--primary)] shadow-sm'
                 : 'hover:bg-[var(--bg-surface-hover)] hover:-translate-y-[1px] hover:shadow-sm text-[var(--fg)]'

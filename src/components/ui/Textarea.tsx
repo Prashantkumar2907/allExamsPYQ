@@ -25,7 +25,7 @@ const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           aria-invalid={error ? true : undefined}
           aria-describedby={errorId}
           className={cn(
-            'w-full text-sm rounded-lg border bg-[var(--bg-surface)] text-[var(--fg)] placeholder:text-[var(--fg-subtle)] transition-all duration-150 focus-ring px-2.5 py-2 resize-none leading-relaxed',
+            'w-full text-sm rounded-lg border bg-[var(--bg-surface)] text-[var(--fg)] placeholder:text-[var(--fg-subtle)] transition duration-150 focus-ring px-2.5 py-2 resize-none leading-relaxed',
             error
               ? 'border-[var(--danger)] border-l-[3px]'
               : 'border-[var(--border)] hover:border-[var(--border-strong)] focus:border-[var(--primary)]',

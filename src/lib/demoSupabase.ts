@@ -6,7 +6,7 @@ type Filter =
   | { type: 'eq'; column: string; value: unknown }
   | { type: 'in'; column: string; values: unknown[] }
   | { type: 'not'; column: string; operator: string; value: unknown }
-  | { type: 'gt' | 'gte'; column: string; value: unknown };
+  | { type: 'gt' | 'gte' | 'lt' | 'lte'; column: string; value: unknown };
 
 type QueryResult<T = unknown> = {
   data: T | null;
@@ -77,6 +77,8 @@ function matchesFilter(row: DemoRow, filter: Filter, state: DemoState) {
   if (filter.type === 'in') return filter.values.includes(value);
   if (filter.type === 'gt') return compareValues(value, filter.value) > 0;
   if (filter.type === 'gte') return compareValues(value, filter.value) >= 0;
+  if (filter.type === 'lt') return compareValues(value, filter.value) < 0;
+  if (filter.type === 'lte') return compareValues(value, filter.value) <= 0;
   if (filter.type === 'not' && filter.operator === 'is' && filter.value === null) return value !== null;
   return true;
 }
@@ -293,6 +295,16 @@ class DemoQuery {
 
   gte(column: string, value: unknown) {
     this.filters.push({ type: 'gte', column, value });
+    return this;
+  }
+
+  lt(column: string, value: unknown) {
+    this.filters.push({ type: 'lt', column, value });
+    return this;
+  }
+
+  lte(column: string, value: unknown) {
+    this.filters.push({ type: 'lte', column, value });
     return this;
   }
 

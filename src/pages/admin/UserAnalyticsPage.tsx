@@ -99,7 +99,7 @@ export default function UserAnalyticsPage() {
       ) : (
         <div className="grid gap-2">
           {filtered.map((s) => (
-            <Card key={s.id} className="flex items-center gap-3 cursor-pointer hover:-translate-y-[1px] hover:shadow-md hover:border-[var(--primary)]/30 transition-all">
+            <Card key={s.id} className="flex items-center gap-3 cursor-pointer hover:-translate-y-[1px] hover:shadow-md hover:border-[var(--primary)]/30 transition">
               <Avatar name={s.full_name} src={s.avatar_url || undefined} size="sm" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-[var(--fg)] truncate">{s.full_name}</p>

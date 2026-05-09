@@ -5,6 +5,7 @@ import { usePageStore } from '../../stores/pageStore';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { ErrorState } from '../../components/shared/ErrorState';
@@ -36,6 +37,7 @@ export default function TestTakingPage() {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [timeLeft, setTimeLeft] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [submitPromptOpen, setSubmitPromptOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const attemptRef = useRef<TestAttempt | null>(null);
   const questionsRef = useRef<Question[]>([]);
@@ -149,6 +151,15 @@ export default function TestTakingPage() {
     if (saveError) toast.error(getErrorMessage(saveError, 'Could not save that answer.'));
   }, [questions, attemptId]);
 
+  function requestSubmit() {
+    const unanswered = questionsRef.current.filter((q) => !answersRef.current[q.id]).length;
+    if (unanswered > 0) {
+      setSubmitPromptOpen(true);
+      return;
+    }
+    void handleSubmit();
+  }
+
   async function handleSubmit() {
     if (submittingRef.current) return;
     submittingRef.current = true;
@@ -255,6 +266,7 @@ export default function TestTakingPage() {
   const mins = Math.floor(timeLeft / 60);
   const secs = timeLeft % 60;
   const answeredCount = Object.values(answers).filter(Boolean).length;
+  const unansweredCount = Math.max(0, questions.length - answeredCount);
   const totalDuration = (attempt?.duration_minutes ?? 60) * 60;
   const timePercent = totalDuration ? (timeLeft / totalDuration) * 100 : 100;
   const timerColor = timePercent > 50 ? 'text-green-500' : timePercent > 20 ? 'text-amber-500' : 'text-red-500';
@@ -274,7 +286,7 @@ export default function TestTakingPage() {
           <Clock className="h-4 w-4" />
           {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
         </div>
-        <Button size="sm" onClick={handleSubmit} loading={submitting}>
+        <Button size="sm" onClick={requestSubmit} loading={submitting}>
           <Send className="h-3.5 w-3.5" /> Submit
         </Button>
       </div>
@@ -297,7 +309,7 @@ export default function TestTakingPage() {
                     })
                   }
                   className={cn(
-                    'flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition-all',
+                    'flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg border transition',
                     flagged.has(question.id)
                       ? 'text-amber-500 bg-amber-500/10 border-amber-500/30'
                       : 'text-[var(--fg-muted)] border-[var(--border)] hover:border-amber-500/30 hover:text-amber-500 hover:bg-amber-500/5'
@@ -326,7 +338,7 @@ export default function TestTakingPage() {
                       key={opt.id}
                       onClick={() => selectAnswer(question.id, opt.id)}
                       className={cn(
-                        'w-full flex items-center gap-3 p-3 rounded-xl border text-left text-sm transition-all duration-150 cursor-pointer',
+                        'w-full flex items-center gap-3 p-3 rounded-xl border text-left text-sm transition duration-150 cursor-pointer',
                         answers[question.id] === opt.id
                           ? 'border-[var(--primary)] bg-[var(--primary)]/8 text-[var(--fg)] shadow-sm'
                           : 'border-[var(--border)] bg-[var(--bg-surface)] text-[var(--fg)] hover:border-[var(--primary)]/30 hover:bg-[var(--primary)]/3'
@@ -334,7 +346,7 @@ export default function TestTakingPage() {
                     >
                       <span
                         className={cn(
-                          'h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 transition-all',
+                          'h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 transition',
                           answers[question.id] === opt.id
                             ? 'bg-[var(--primary)] text-[var(--primary-fg)] scale-110'
                             : 'bg-[var(--bg-surface-hover)] text-[var(--fg-muted)]'
@@ -382,7 +394,7 @@ export default function TestTakingPage() {
                 key={q.id}
                 onClick={() => setCurrentIdx(i)}
                 className={cn(
-                  'h-8 w-8 rounded-full text-[11px] font-semibold transition-all duration-100 cursor-pointer flex items-center justify-center',
+                  'h-8 w-8 rounded-full text-[11px] font-semibold transition duration-100 cursor-pointer flex items-center justify-center',
                   i === currentIdx && 'ring-2 ring-[var(--primary)] ring-offset-1 ring-offset-[var(--bg-surface)]',
                   answers[q.id]
                     ? 'bg-[var(--primary)] text-[var(--primary-fg)]'
@@ -411,6 +423,19 @@ export default function TestTakingPage() {
           </div>
         </div>
       </div>
+      <ConfirmDialog
+        open={submitPromptOpen}
+        onOpenChange={setSubmitPromptOpen}
+        title="Submit test"
+        description={`You still have ${unansweredCount} unanswered ${unansweredCount === 1 ? 'question' : 'questions'}. Submit now and mark them as skipped?`}
+        confirmLabel="Submit anyway"
+        onConfirm={() => {
+          setSubmitPromptOpen(false);
+          void handleSubmit();
+        }}
+        loading={submitting}
+        variant="primary"
+      />
     </div>
   );
 }

@@ -69,7 +69,7 @@ export default function ReportedQuestionsPage() {
   function renderReport(r: ReportItem) {
     const isPending = r.status === 'pending' || r.status === 'reviewed';
     return (
-      <div key={r.id} className={cn('p-3 rounded-lg bg-[var(--bg-body)] transition-all', isPending ? 'border-l-2 border-l-amber-400' : 'opacity-75')}>
+      <div key={r.id} className={cn('p-3 rounded-lg bg-[var(--bg-body)] transition', isPending ? 'border-l-2 border-l-amber-400' : 'opacity-75')}>
         <div className="flex items-start justify-between gap-2 mb-1">
           <div className="min-w-0">
             <p className="text-sm font-medium text-[var(--fg)] line-clamp-2">

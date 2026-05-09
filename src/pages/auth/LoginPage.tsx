@@ -13,15 +13,15 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const { signIn, loading } = useAuthStore();
+  const { signIn, submitting } = useAuthStore();
   const { toggleTheme, resolvedTheme } = useThemeStore();
   const isDark = resolvedTheme() === 'dark';
   const navigate = useNavigate();
 
   function fillDemoAccount(role: 'student' | 'admin') {
     if (role === 'admin') {
-      setEmail('admin@example.com');
-      setPassword('adminpassword123');
+      setEmail('admin@allexamspyq.local');
+      setPassword('Admin@12345');
       return;
     }
     setEmail('demoaccount@allexamspyq.local');
@@ -114,12 +114,12 @@ export default function LoginPage() {
             </div>
 
             {error && (
-              <div className="text-xs text-[var(--danger)] bg-[var(--danger)]/10 px-3 py-2 rounded-lg animate-fade-in">
+              <div className="text-xs text-[var(--danger)] bg-[var(--danger)]/10 px-3 py-2 rounded-lg animate-fade-in" role="alert" aria-live="polite">
                 {error}
               </div>
             )}
 
-            <Button type="submit" className="w-full" size="lg" loading={loading}>
+            <Button type="submit" className="w-full" size="lg" loading={submitting}>
               Sign In
             </Button>
           </form>

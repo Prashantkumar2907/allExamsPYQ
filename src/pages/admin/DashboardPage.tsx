@@ -1,22 +1,28 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { usePageStore } from '../../stores/pageStore';
 import { StatsCard } from '../../components/shared/StatsCard';
 import { ErrorState } from '../../components/shared/ErrorState';
 import { Card, CardHeader, CardTitle } from '../../components/ui/Card';
-import { Badge } from '../../components/ui/Badge';
-import { CHART_COLORS } from '../../lib/constants';
+import { DIFFICULTY_COLORS } from '../../lib/constants';
 import { getErrorMessage } from '../../lib/api';
 import { cn, formatDate } from '../../lib/utils';
 import {
   Users, BookOpen, FileText, ClipboardList, Activity,
-  ArrowRight, AlertTriangle, TrendingUp,
+  ArrowRight, AlertTriangle,
 } from 'lucide-react';
-import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell,
-} from 'recharts';
+
+const AdminDailyAttemptsChart = lazy(() =>
+  import('../../components/charts/DashboardCharts').then((module) => ({ default: module.AdminDailyAttemptsChart }))
+);
+const AdminDifficultyChart = lazy(() =>
+  import('../../components/charts/DashboardCharts').then((module) => ({ default: module.AdminDifficultyChart }))
+);
+
+function ChartFallback({ className = 'h-full' }: { className?: string }) {
+  return <div className={`${className} rounded-lg animate-shimmer`} />;
+}
 
 interface RecentAttempt {
   id: string;
@@ -47,7 +53,21 @@ export default function DashboardPage() {
     setLoading(true);
     setError('');
     try {
-      const [usersRes, examsRes, questionsRes, testsRes, attemptsRes, recentRes, reportRes, diffRes] = await Promise.all([
+      const difficulties = ['easy', 'medium', 'hard'] as const;
+      const dayWindows = Array.from({ length: 7 }, (_, index) => {
+        const start = new Date();
+        start.setHours(0, 0, 0, 0);
+        start.setDate(start.getDate() - (6 - index));
+        const end = new Date(start);
+        end.setDate(end.getDate() + 1);
+        return {
+          date: start.toLocaleDateString('en-US', { weekday: 'short' }),
+          start: start.toISOString(),
+          end: end.toISOString(),
+        };
+      });
+
+      const [usersRes, examsRes, questionsRes, testsRes, attemptsRes, recentRes, reportRes, ...metricRes] = await Promise.all([
         supabase.from('profiles').select('id', { count: 'exact', head: true }),
         supabase.from('exams').select('id', { count: 'exact', head: true }),
         supabase.from('questions').select('id', { count: 'exact', head: true }),
@@ -55,10 +75,18 @@ export default function DashboardPage() {
         supabase.from('test_attempts').select('id', { count: 'exact', head: true }),
         supabase.from('test_attempts').select('id, source_name, score, total_marks, completed_at, profile:profiles!user_id(full_name)').eq('status', 'completed').order('completed_at', { ascending: false }).limit(5),
         supabase.from('reported_questions').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-        supabase.from('questions').select('difficulty').limit(5000),
+        ...difficulties.map((difficulty) => supabase.from('questions').select('id', { count: 'exact', head: true }).eq('difficulty', difficulty)),
+        ...dayWindows.map((day) =>
+          supabase
+            .from('test_attempts')
+            .select('id', { count: 'exact', head: true })
+            .eq('status', 'completed')
+            .gte('completed_at', day.start)
+            .lt('completed_at', day.end)
+        ),
       ]);
 
-      [usersRes, examsRes, questionsRes, testsRes, attemptsRes, recentRes, reportRes, diffRes].forEach((res) => {
+      [usersRes, examsRes, questionsRes, testsRes, attemptsRes, recentRes, reportRes, ...metricRes].forEach((res) => {
         if (res.error) throw res.error;
       });
 
@@ -73,33 +101,15 @@ export default function DashboardPage() {
       if (recentRes.data) setRecentAttempts(recentRes.data as unknown as RecentAttempt[]);
       setReportedCount(reportRes.count || 0);
 
-      if (diffRes.data) {
-        const counts: Record<string, number> = {};
-        (diffRes.data as { difficulty: string | null }[]).forEach((q) => {
-          if (q.difficulty) counts[q.difficulty] = (counts[q.difficulty] || 0) + 1;
-        });
-        setDifficultyData(Object.entries(counts).map(([name, count]) => ({ name, count })));
-      }
+      const difficultyResults = metricRes.slice(0, difficulties.length);
+      setDifficultyData(
+        difficulties
+          .map((name, index) => ({ name, count: difficultyResults[index]?.count || 0 }))
+          .filter((item) => item.count > 0)
+      );
 
-      // Get daily attempts for last 7 days
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      const { data: dailyData, error: dailyError } = await supabase.from('test_attempts').select('completed_at').eq('status', 'completed').gte('completed_at', sevenDaysAgo.toISOString()).limit(10000);
-      if (dailyError) throw dailyError;
-      if (dailyData) {
-        const dayCounts: Record<string, number> = {};
-        for (let i = 6; i >= 0; i--) {
-          const d = new Date(); d.setDate(d.getDate() - i);
-          dayCounts[d.toLocaleDateString('en-US', { weekday: 'short' })] = 0;
-        }
-        (dailyData as { completed_at: string | null }[]).forEach((a) => {
-          if (a.completed_at) {
-            const day = new Date(a.completed_at).toLocaleDateString('en-US', { weekday: 'short' });
-            if (day in dayCounts) dayCounts[day]++;
-          }
-        });
-        setDailyAttempts(Object.entries(dayCounts).map(([date, count]) => ({ date, count })));
-      }
+      const dailyResults = metricRes.slice(difficulties.length);
+      setDailyAttempts(dayWindows.map((day, index) => ({ date: day.date, count: dailyResults[index]?.count || 0 })));
     } catch (err) { setError(getErrorMessage(err, 'Unable to load admin dashboard.')); }
     finally { setLoading(false); }
   }
@@ -119,8 +129,6 @@ export default function DashboardPage() {
     );
   }
   if (error) return <ErrorState description={error} onRetry={loadStats} />;
-
-  const diffColors: Record<string, string> = { easy: '#22c55e', medium: '#f59e0b', hard: '#ef4444' };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -159,14 +167,9 @@ export default function DashboardPage() {
           </CardHeader>
           {dailyAttempts.length > 0 ? (
             <div className="h-48">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dailyAttempts}>
-                  <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                  <Tooltip contentStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
-                  <Bar dataKey="count" fill={CHART_COLORS[0]} radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <Suspense fallback={<ChartFallback />}>
+                <AdminDailyAttemptsChart data={dailyAttempts} />
+              </Suspense>
             </div>
           ) : (
             <div className="flex items-center justify-center py-12">
@@ -186,19 +189,14 @@ export default function DashboardPage() {
           {difficultyData.length > 0 ? (
             <>
               <div className="h-40 flex items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={difficultyData} cx="50%" cy="50%" innerRadius={35} outerRadius={55} dataKey="count" paddingAngle={3} strokeWidth={0}>
-                      {difficultyData.map((d) => <Cell key={d.name} fill={diffColors[d.name] || CHART_COLORS[3]} />)}
-                    </Pie>
-                    <Tooltip contentStyle={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }} />
-                  </PieChart>
-                </ResponsiveContainer>
+                <Suspense fallback={<ChartFallback />}>
+                  <AdminDifficultyChart data={difficultyData} />
+                </Suspense>
               </div>
               <div className="flex justify-center gap-4 pt-2 border-t border-[var(--border)]">
                 {difficultyData.map((d) => (
                   <div key={d.name} className="flex items-center gap-1.5">
-                    <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: diffColors[d.name] || CHART_COLORS[3] }} />
+                    <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: DIFFICULTY_COLORS[d.name] || '#3a9cc0' }} />
                     <span className="text-[11px] text-[var(--fg-muted)] capitalize">{d.name} <span className="text-[var(--fg)] font-medium">({d.count})</span></span>
                   </div>
                 ))}

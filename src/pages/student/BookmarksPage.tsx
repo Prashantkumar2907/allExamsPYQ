@@ -138,7 +138,7 @@ export default function BookmarksPage() {
           placeholder="Search bookmarked questions..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--fg)] placeholder:text-[var(--fg-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30 focus:border-[var(--primary)]/50 transition-all"
+          className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--fg)] placeholder:text-[var(--fg-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30 focus:border-[var(--primary)]/50 transition"
         />
       </div>
 
@@ -149,7 +149,7 @@ export default function BookmarksPage() {
           <button
             onClick={() => setActiveSubject('all')}
             className={cn(
-              'px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all',
+              'px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition',
               activeSubject === 'all'
                 ? 'bg-[var(--primary)] text-white shadow-sm'
                 : 'text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-surface-hover)]'
@@ -164,7 +164,7 @@ export default function BookmarksPage() {
                 key={subj.id}
                 onClick={() => setActiveSubject(subj.id)}
                 className={cn(
-                  'px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all',
+                  'px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition',
                   activeSubject === subj.id
                     ? 'bg-[var(--primary)] text-white shadow-sm'
                     : 'text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--bg-surface-hover)]'
@@ -309,7 +309,7 @@ export default function BookmarksPage() {
                   onChange={(e) => setNoteText(e.target.value)}
                   rows={3}
                   placeholder="Add your notes about this question..."
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--bg-body)] text-[var(--fg)] placeholder:text-[var(--fg-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30 focus:border-[var(--primary)]/50 transition-all resize-none"
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--bg-body)] text-[var(--fg)] placeholder:text-[var(--fg-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30 focus:border-[var(--primary)]/50 transition resize-none"
                 />
                 <div className="flex items-center gap-2">
                   <Button size="sm" onClick={saveNote} disabled={savingNote} loading={savingNote}>

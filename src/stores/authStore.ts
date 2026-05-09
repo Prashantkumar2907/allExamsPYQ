@@ -11,6 +11,7 @@ interface AuthState {
   profile: Profile | null;
   session: Session | null;
   loading: boolean;
+  submitting: boolean;
   initialized: boolean;
   profileError: string | null;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
@@ -35,6 +36,7 @@ export const useAuthStore = create<AuthState>()(
       profile: null,
       session: null,
       loading: true,
+      submitting: false,
       initialized: false,
       profileError: null,
 
@@ -79,21 +81,39 @@ export const useAuthStore = create<AuthState>()(
       },
 
       signIn: async (email, password) => {
-        set({ loading: true });
-        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-        set({ loading: false });
-        return { error: error?.message ?? null };
+        set({ submitting: true });
+        try {
+          const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+          if (!error && data.session?.user) {
+            set({ user: data.session.user, session: data.session });
+            await get().fetchProfile(data.session.user.id);
+          }
+          return { error: error?.message ?? null };
+        } catch (err) {
+          return { error: getErrorMessage(err, 'Unable to sign in.') };
+        } finally {
+          set({ submitting: false });
+        }
       },
 
       signUp: async (email, password, fullName, examId) => {
-        set({ loading: true });
-        const { error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: { data: { full_name: normalizeText(fullName), exam_id: examId } },
-        });
-        set({ loading: false });
-        return { error: error?.message ?? null };
+        set({ submitting: true });
+        try {
+          const { data, error } = await supabase.auth.signUp({
+            email: email.trim(),
+            password,
+            options: { data: { full_name: normalizeText(fullName), exam_id: examId } },
+          });
+          if (!error && data.session?.user) {
+            set({ user: data.session.user, session: data.session });
+            await get().fetchProfile(data.session.user.id);
+          }
+          return { error: error?.message ?? null };
+        } catch (err) {
+          return { error: getErrorMessage(err, 'Unable to create your account.') };
+        } finally {
+          set({ submitting: false });
+        }
       },
 
       signOut: async () => {

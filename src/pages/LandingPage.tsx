@@ -73,9 +73,9 @@ export default function LandingPage() {
           {features.map((f) => (
             <div
               key={f.title}
-              className="group rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] p-5 hover:border-[var(--primary)]/30 hover:shadow-lg transition-all duration-200"
+              className="group rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] p-5 hover:border-[var(--primary)]/30 hover:shadow-lg transition duration-200"
             >
-              <div className="h-10 w-10 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center mb-3 group-hover:bg-[var(--primary)]/15 group-hover:scale-105 transition-all duration-200">
+              <div className="h-10 w-10 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center mb-3 group-hover:bg-[var(--primary)]/15 group-hover:scale-105 transition duration-200">
                 <f.icon className="h-5 w-5 text-[var(--primary)]" />
               </div>
               <h3 className="text-sm font-semibold text-[var(--fg)] mb-1">{f.title}</h3>
