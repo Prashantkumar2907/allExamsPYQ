@@ -28,7 +28,7 @@ export function Pagination({ page, pageSize, total, onPageChange, className }: P
   return (
     <nav
       className={cn(
-        'flex flex-col gap-2 rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2 sm:flex-row sm:items-center sm:justify-between',
+        'flex flex-col gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-3 py-2 sm:flex-row sm:items-center sm:justify-between',
         className
       )}
       aria-label="Pagination"

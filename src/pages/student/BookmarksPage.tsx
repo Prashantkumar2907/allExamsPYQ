@@ -6,7 +6,11 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Sheet } from '../../components/ui/Sheet';
+import { EmptyState } from '../../components/shared/EmptyState';
+import { ErrorState } from '../../components/shared/ErrorState';
+import { toast } from '../../components/ui/Toast';
 import { cn } from '../../lib/utils';
+import { getErrorMessage } from '../../lib/api';
 import { Bookmark, Trash2, CheckCircle, Search, ChevronRight, BookOpen, Filter, XCircle } from 'lucide-react';
 import type { Question, Option } from '../../types/database';
 
@@ -23,6 +27,7 @@ export default function BookmarksPage() {
   const { profile } = useAuthStore();
   const setPage = usePageStore((s) => s.setPage);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [bookmarks, setBookmarks] = useState<BookmarkItem[]>([]);
   const [hasMore, setHasMore] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -40,12 +45,18 @@ export default function BookmarksPage() {
 
   async function loadBookmarks(append = false) {
     const from = append ? bookmarks.length : 0;
-    const { data } = await supabase
+    if (!append) setError('');
+    const { data, error: bookmarksError } = await supabase
       .from('bookmarks')
       .select('*, question:questions(*, options(*), topic:topics(id, name, chapter:chapters(id, name, subject:subjects(id, name))))')
       .eq('user_id', profile!.id)
       .order('created_at', { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
+    if (bookmarksError) {
+      setError(getErrorMessage(bookmarksError, 'Unable to load bookmarks.'));
+      setLoading(false);
+      return;
+    }
     if (data) {
       setBookmarks(prev => append ? [...prev, ...(data as BookmarkItem[])] : data as BookmarkItem[]);
       setHasMore(data.length === PAGE_SIZE);
@@ -54,9 +65,14 @@ export default function BookmarksPage() {
   }
 
   async function removeBookmark(id: string) {
-    await supabase.from('bookmarks').delete().eq('id', id);
+    const { error: removeError } = await supabase.from('bookmarks').delete().eq('id', id);
+    if (removeError) {
+      toast.error(getErrorMessage(removeError, 'Could not remove bookmark.'));
+      return;
+    }
     setBookmarks((prev) => prev.filter((b) => b.id !== id));
     if (selectedBm?.id === id) setSelectedBm(null);
+    toast.success('Bookmark removed.');
   }
 
   function openSheet(bm: BookmarkItem) { setSelectedBm(bm); setNoteText(bm.notes ?? ''); }
@@ -64,9 +80,15 @@ export default function BookmarksPage() {
   async function saveNote() {
     if (!selectedBm) return;
     setSavingNote(true);
-    await supabase.from('bookmarks').update({ notes: noteText }).eq('id', selectedBm.id);
+    const { error: noteError } = await supabase.from('bookmarks').update({ notes: noteText }).eq('id', selectedBm.id);
+    if (noteError) {
+      toast.error(getErrorMessage(noteError, 'Could not save notes.'));
+      setSavingNote(false);
+      return;
+    }
     setBookmarks((prev) => prev.map((b) => b.id === selectedBm.id ? { ...b, notes: noteText } : b));
     setSavingNote(false);
+    toast.success('Notes saved.');
   }
 
   const subjects = useMemo(() => {
@@ -100,16 +122,10 @@ export default function BookmarksPage() {
     );
   }
 
+  if (error) return <ErrorState description={error} onRetry={() => loadBookmarks()} />;
+
   if (!bookmarks.length) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 animate-fade-in">
-        <div className="h-16 w-16 rounded-full bg-[var(--fg-muted)]/10 flex items-center justify-center mb-4">
-          <Bookmark className="h-8 w-8 text-[var(--fg-muted)]" />
-        </div>
-        <h2 className="text-lg font-semibold text-[var(--fg)] mb-1">No bookmarks yet</h2>
-        <p className="text-sm text-[var(--fg-muted)]">Bookmark questions from test results to review them later.</p>
-      </div>
-    );
+    return <EmptyState icon={Bookmark} title="No bookmarks yet" description="Bookmark questions from test results to review them later." />;
   }
 
   return (
@@ -172,6 +188,14 @@ export default function BookmarksPage() {
               key={bm.id}
               className="flex items-center gap-3 px-3.5 py-2.5 hover:bg-[var(--bg-surface-hover)] cursor-pointer transition-colors group"
               onClick={() => openSheet(bm)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  openSheet(bm);
+                }
+              }}
+              role="button"
+              tabIndex={0}
             >
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-[var(--fg)] line-clamp-1">{q.question_text}</p>
@@ -185,7 +209,9 @@ export default function BookmarksPage() {
                     </span>
                   )}
                   {correctOpt && (
-                    <span className="text-[11px] text-green-600 truncate max-w-48">✓ {correctOpt.option_text}</span>
+                    <span className="inline-flex items-center gap-1 text-[11px] text-green-600 truncate max-w-48">
+                      <CheckCircle className="h-3 w-3 flex-shrink-0" /> {correctOpt.option_text}
+                    </span>
                   )}
                 </div>
               </div>
@@ -193,6 +219,7 @@ export default function BookmarksPage() {
                 <button
                   onClick={(e) => { e.stopPropagation(); removeBookmark(bm.id); }}
                   className="h-7 w-7 flex items-center justify-center rounded-md text-[var(--fg-muted)] hover:text-red-500 hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100"
+                  aria-label="Remove bookmark"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
@@ -237,7 +264,7 @@ export default function BookmarksPage() {
               {/* Breadcrumb */}
               {subjectName && (
                 <p className="text-[10px] text-[var(--fg-muted)]">
-                  {[subjectName, chapterName, topicName].filter(Boolean).join(' › ')}
+                  {[subjectName, chapterName, topicName].filter(Boolean).join(' / ')}
                 </p>
               )}
 
@@ -269,14 +296,14 @@ export default function BookmarksPage() {
               {/* Question explanation */}
               {q.explanation && (
                 <div className="rounded-lg bg-[var(--primary)]/8 border border-[var(--primary)]/15 p-3">
-                  <p className="text-xs font-semibold text-[var(--primary)] mb-1">💡 Explanation</p>
+                  <p className="text-xs font-semibold text-[var(--primary)] mb-1">Explanation</p>
                   <p className="text-xs text-[var(--fg-muted)] leading-relaxed">{q.explanation}</p>
                 </div>
               )}
 
               {/* Notes */}
               <div className="space-y-2 pt-2 border-t border-[var(--border)]">
-                <label className="text-xs font-medium text-[var(--fg-muted)] block">📝 Your Notes</label>
+                <label className="text-xs font-medium text-[var(--fg-muted)] block">Your Notes</label>
                 <textarea
                   value={noteText}
                   onChange={(e) => setNoteText(e.target.value)}

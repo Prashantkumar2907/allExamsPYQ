@@ -41,7 +41,7 @@ export default function BulkUploadPage() {
 
   function downloadTemplate() {
     const headers = ['exam', 'subject', 'chapter', 'topic', 'question_text', 'question_type', 'difficulty', 'marks', 'negative_marks', 'year', 'explanation', 'option_a', 'explanation_a', 'option_b', 'explanation_b', 'option_c', 'explanation_c', 'option_d', 'explanation_d', 'correct_answer'];
-    const sampleRow = ['JEE Main', 'Physics', 'Mechanics', 'Newton Laws', 'What is Newton\'s second law?', 'single_choice', 'medium', '4', '1', '2024', 'Newton\'s second law states F=ma', 'F = ma', 'This is the correct formula relating force, mass and acceleration', 'E = mc²', 'This is Einstein\'s mass-energy equivalence formula', 'P = mv', 'This is the formula for momentum', 'F = mg', 'This is the formula for weight', 'a'];
+const sampleRow = ['JEE Main', 'Physics', 'Mechanics', 'Newton Laws', 'What is Newton\'s second law?', 'single_choice', 'medium', '4', '1', '2024', 'Newton\'s second law states F=ma', 'F = ma', 'This is the correct formula relating force, mass and acceleration', 'E = mc^2', 'This is Einstein\'s mass-energy equivalence formula', 'P = mv', 'This is the formula for momentum', 'F = mg', 'This is the formula for weight', 'a'];
     const csv = Papa.unparse([headers, sampleRow]);
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -234,7 +234,7 @@ export default function BulkUploadPage() {
             dragOver ? 'border-[var(--primary)] bg-[var(--primary)]/5 scale-[1.01]' : 'border-[var(--border)] hover:border-[var(--fg-muted)]'
           )}
         >
-          <div className={cn('h-14 w-14 rounded-2xl flex items-center justify-center transition-colors', dragOver ? 'bg-[var(--primary)]/10' : 'bg-[var(--bg-body)]')}>
+        <div className={cn('h-14 w-14 rounded-lg flex items-center justify-center transition-colors', dragOver ? 'bg-[var(--primary)]/10' : 'bg-[var(--bg-body)]')}>
             <Upload className={cn('h-7 w-7 transition-colors', dragOver ? 'text-[var(--primary)]' : 'text-[var(--fg-muted)]')} />
           </div>
           <div className="text-center">

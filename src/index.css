@@ -280,7 +280,7 @@ body {
   --fg: var(--fg) !important;
 }
 
-/* Native form elements — dark mode compatibility */
+/* Native form elements - dark mode compatibility */
 select, option {
   background-color: var(--bg-surface);
   color: var(--fg);

@@ -152,17 +152,16 @@ export default function DashboardPage() {
     <div className="space-y-6 stagger-children">
       {/* Welcome Hero */}
       <div className="relative rounded-xl bg-gradient-to-br from-[var(--primary)]/10 via-[var(--primary)]/5 to-transparent border border-[var(--primary)]/15 p-5 overflow-hidden">
-        <div className="absolute top-0 right-0 w-48 h-48 bg-[var(--primary)]/5 rounded-full -translate-y-1/2 translate-x-1/3 blur-2xl" />
         <div className="relative">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h1 className="text-xl font-bold text-[var(--fg)]">
-                {greeting}, {profile?.full_name?.split(' ')[0]} 👋
+                {greeting}, {profile?.full_name?.split(' ')[0]}
               </h1>
               <p className="text-sm text-[var(--fg-muted)] mt-1">
                 {nextTest
                   ? `Next up: ${nextTest.title} on ${formatDate(nextTest.scheduled_at)}`
-                  : 'Keep up the momentum — consistency is key!'}
+                  : 'Keep up the momentum - consistency is key.'}
               </p>
             </div>
             {profile?.exam?.name && (
@@ -300,7 +299,7 @@ export default function DashboardPage() {
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-[var(--fg)] truncate">{a.source_name}</p>
                     <p className="text-[11px] text-[var(--fg-muted)]">
-                      {a.correct_answers}✓ · {a.wrong_answers}✗ · {acc}% acc
+                      {a.correct_answers} correct - {a.wrong_answers} wrong - {acc}% acc
                     </p>
                   </div>
                   <span className="text-[11px] text-[var(--fg-muted)] flex-shrink-0">{formatDate(a.completed_at ?? a.started_at)}</span>

@@ -93,7 +93,7 @@ export default function AnalyticsPage() {
     { name: 'Medium', attempted: 0, correct: 0 },
     { name: 'Hard', attempted: 0, correct: 0 },
   ];
-  // We approximate from attempts — real data would join user_answers with questions
+  // We approximate from attempts; real data would join user_answers with questions.
   const totalCorrect = attempts.reduce((s, a) => s + a.correct_answers, 0);
   const totalQ = attempts.reduce((s, a) => s + a.total_questions, 0);
   const avgAcc = totalQ ? Math.round((totalCorrect / totalQ) * 100) : 0;

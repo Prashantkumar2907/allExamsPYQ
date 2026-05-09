@@ -1,6 +1,7 @@
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { ChevronDown, Check } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useId } from 'react';
 
 interface SelectOption {
   value: string;
@@ -17,13 +18,16 @@ interface SelectProps {
 }
 
 export function Select({ value, onValueChange, options, placeholder = 'Select...', label, className }: SelectProps) {
+  const triggerId = useId();
+
   return (
     <div className="space-y-1">
-      {label && <label className="block text-xs font-medium text-[var(--fg-muted)]">{label}</label>}
+      {label && <label htmlFor={triggerId} className="block text-xs font-medium text-[var(--fg-muted)]">{label}</label>}
       <SelectPrimitive.Root value={value} onValueChange={onValueChange}>
         <SelectPrimitive.Trigger
+          id={triggerId}
           className={cn(
-            'inline-flex items-center justify-between w-full h-9 px-2.5 text-sm rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--fg)] hover:border-[var(--border-strong)] transition-all duration-200 focus-ring cursor-pointer',
+            'inline-flex items-center justify-between w-full h-9 px-2.5 text-sm rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] text-[var(--fg)] hover:border-[var(--border-strong)] transition-all duration-200 focus-ring cursor-pointer',
             className
           )}
         >

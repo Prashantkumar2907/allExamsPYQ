@@ -236,7 +236,7 @@ export default function TestListPage() {
 
   return (
     <div className="space-y-4">
-      {/* Available Tests tabs — exam vs global */}
+      {/* Available Tests tabs - exam vs global */}
       <Tabs
         items={[
           {
@@ -297,8 +297,8 @@ export default function TestListPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-[var(--fg)] truncate group-hover:text-[var(--primary)] transition-colors">{att.source_name}</p>
                       <div className="flex items-center gap-3 mt-0.5">
-                        <span className="text-[11px] text-[var(--fg-muted)]">{att.completed_at ? formatDate(att.completed_at) : '—'}</span>
-                        <span className="flex items-center gap-0.5 text-[11px] text-[var(--fg-muted)]"><Clock className="h-2.5 w-2.5" />{att.time_taken_seconds ? formatTime(att.time_taken_seconds) : '—'}</span>
+                      <span className="text-[11px] text-[var(--fg-muted)]">{att.completed_at ? formatDate(att.completed_at) : '-'}</span>
+                      <span className="flex items-center gap-0.5 text-[11px] text-[var(--fg-muted)]"><Clock className="h-2.5 w-2.5" />{att.time_taken_seconds ? formatTime(att.time_taken_seconds) : '-'}</span>
                       </div>
                     </div>
                     {/* Stats */}

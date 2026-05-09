@@ -395,7 +395,7 @@ export default function TestManagementPage() {
               <div className="flex items-center gap-2 flex-wrap">
                 <Badge dot variant={statusColors[t.status]}>{t.status}</Badge>
                 {t.is_global && <Badge><Globe className="h-2.5 w-2.5 mr-0.5" /> Global</Badge>}
-                <span className="text-[10px] text-[var(--fg-muted)]">{t.duration_minutes}m · {t.total_marks} marks</span>
+                      <span className="text-[10px] text-[var(--fg-muted)]">{t.duration_minutes}m - {t.total_marks} marks</span>
               </div>
               {t.scheduled_at && (
                 <div className="flex items-center gap-1 mt-1.5 text-[10px] text-[var(--fg-muted)]">

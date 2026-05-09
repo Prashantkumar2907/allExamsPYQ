@@ -46,7 +46,7 @@ export default function ProfilePage() {
 
   if (!profile) return (
     <div className="space-y-5 animate-fade-in max-w-lg">
-      <div className="h-40 rounded-2xl animate-shimmer" />
+      <div className="h-40 rounded-lg animate-shimmer" />
       <div className="h-48 rounded-xl animate-shimmer" />
       <div className="h-24 rounded-xl animate-shimmer" />
     </div>
@@ -55,7 +55,7 @@ export default function ProfilePage() {
   return (
     <div className="space-y-5 animate-fade-in max-w-lg">
       {/* Hero Banner */}
-      <div className="relative rounded-2xl bg-gradient-to-br from-[var(--primary)]/20 via-[var(--primary)]/10 to-transparent p-5 pt-6 flex flex-col items-center text-center border border-[var(--border)]">
+      <div className="relative rounded-lg bg-gradient-to-br from-[var(--primary)]/20 via-[var(--primary)]/10 to-transparent p-5 pt-6 flex flex-col items-center text-center border border-[var(--border)]">
         <Avatar name={fullName} src={getAvatarUrl(avatarStyle, fullName)} size="lg" />
         <h1 className="text-xl font-bold text-[var(--fg)] mt-3">{fullName}</h1>
         <p className="text-xs text-[var(--fg-muted)] mt-0.5">{profile.email} - Admin</p>

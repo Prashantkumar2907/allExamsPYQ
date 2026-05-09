@@ -77,7 +77,7 @@ export default function ReportedQuestionsPage() {
             </p>
             <div className="flex items-center gap-2 mt-1 text-[11px] text-[var(--fg-muted)]">
               <span className="font-medium text-[var(--fg)]">{r.profile?.full_name || 'Unknown'}</span>
-              <span>·</span>
+                    <span>-</span>
               <span>{formatDate(r.created_at)}</span>
             </div>
           </div>

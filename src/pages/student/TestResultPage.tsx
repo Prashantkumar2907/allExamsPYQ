@@ -7,6 +7,7 @@ import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Dialog } from '../../components/ui/Dialog';
+import { Textarea } from '../../components/ui/Textarea';
 import { ErrorState } from '../../components/shared/ErrorState';
 import { toast } from '../../components/ui/Toast';
 import { getErrorMessage } from '../../lib/api';
@@ -44,6 +45,8 @@ export default function TestResultPage() {
   const [reportDialogOpen, setReportDialogOpen] = useState(false);
   const [reportQuestionId, setReportQuestionId] = useState('');
   const [reportReason, setReportReason] = useState('');
+  const [reportDescription, setReportDescription] = useState('');
+  const [savingReport, setSavingReport] = useState(false);
   const [bookmarkDialogOpen, setBookmarkDialogOpen] = useState(false);
   const [bookmarkQuestionId, setBookmarkQuestionId] = useState('');
   const [bookmarkNote, setBookmarkNote] = useState('');
@@ -116,18 +119,23 @@ export default function TestResultPage() {
 
   async function submitReport() {
     if (!reportReason.trim()) return;
+    setSavingReport(true);
     const { error: reportError } = await supabase.from('reported_questions').insert({
       user_id: profile!.id,
       question_id: reportQuestionId,
       reason: reportReason,
+      description: reportDescription.trim() || null,
       status: 'pending' as const,
     });
     if (reportError) {
       toast.error(getErrorMessage(reportError, 'Could not submit report.'));
+      setSavingReport(false);
       return;
     }
+    setSavingReport(false);
     setReportDialogOpen(false);
     setReportReason('');
+    setReportDescription('');
     toast.success('Report submitted.');
   }
 
@@ -152,7 +160,7 @@ export default function TestResultPage() {
     { label: 'Correct', value: attempt.correct_answers, icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-500/10' },
     { label: 'Wrong', value: attempt.wrong_answers, icon: XCircle, color: 'text-red-500', bg: 'bg-red-500/10' },
     { label: 'Skipped', value: attempt.skipped, icon: MinusCircle, color: 'text-gray-400', bg: 'bg-gray-400/10' },
-    { label: 'Time', value: attempt.time_taken_seconds ? formatTime(attempt.time_taken_seconds) : '—', icon: Clock, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+    { label: 'Time', value: attempt.time_taken_seconds ? formatTime(attempt.time_taken_seconds) : '-', icon: Clock, color: 'text-amber-500', bg: 'bg-amber-500/10' },
   ];
 
   return (
@@ -181,7 +189,7 @@ export default function TestResultPage() {
           </div>
           <div>
             <h2 className="text-base font-bold text-[var(--fg)]">{attempt.source_name}</h2>
-            <p className="text-xs text-[var(--fg-muted)]">{attempt.total_questions} questions · {attempt.total_marks} total marks</p>
+            <p className="text-xs text-[var(--fg-muted)]">{attempt.total_questions} questions - {attempt.total_marks} total marks</p>
           </div>
         </div>
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
@@ -316,6 +324,7 @@ export default function TestResultPage() {
                 <button
                   key={reason}
                   onClick={() => setReportReason(reason)}
+                  aria-pressed={reportReason === reason}
                   className={cn(
                     'w-full text-left px-3 py-2 rounded-lg text-sm transition-colors border',
                     reportReason === reason
@@ -328,9 +337,16 @@ export default function TestResultPage() {
               ))}
             </div>
           </div>
+          <Textarea
+            label="Details (optional)"
+            value={reportDescription}
+            onChange={(event) => setReportDescription(event.target.value)}
+            rows={3}
+            placeholder="Add context that helps the admin verify the issue."
+          />
           <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
-            <Button variant="secondary" size="sm" onClick={() => setReportDialogOpen(false)}>Cancel</Button>
-            <Button size="sm" onClick={submitReport} disabled={!reportReason}>
+            <Button variant="secondary" size="sm" onClick={() => setReportDialogOpen(false)} disabled={savingReport}>Cancel</Button>
+            <Button size="sm" onClick={submitReport} disabled={!reportReason || savingReport} loading={savingReport}>
               <Flag className="h-3.5 w-3.5" /> Submit Report
             </Button>
           </div>

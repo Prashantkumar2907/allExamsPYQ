@@ -144,7 +144,6 @@ export default function ProfilePage() {
       {/* Profile Hero Card */}
       <Card className="relative overflow-hidden !p-0">
         <div className="absolute inset-0 bg-gradient-to-br from-[var(--primary)]/15 via-[var(--primary)]/5 to-transparent" />
-        <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--primary)]/5 rounded-full -translate-y-1/3 translate-x-1/4 blur-3xl" />
         <div className="relative p-5 md:p-6">
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
             <div className="relative group cursor-pointer" onClick={openAvatarDialog}>
@@ -174,7 +173,7 @@ export default function ProfilePage() {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-5 border-t border-[var(--border)]/50">
             {[
-              { label: 'RANK', value: stats.rank > 0 ? `#${stats.rank}` : '—', icon: Award },
+              { label: 'RANK', value: stats.rank > 0 ? `#${stats.rank}` : '-', icon: Award },
               { label: 'POINTS', value: stats.points.toLocaleString(), icon: Target },
               { label: 'ACCURACY', value: `${stats.accuracy}%`, icon: CheckCircle },
               { label: 'TESTS', value: stats.testsCount, icon: Hash },
@@ -322,13 +321,13 @@ export default function ProfilePage() {
               </div>
               {q.explanation && (
                 <div className="rounded-lg bg-[var(--primary)]/8 border border-[var(--primary)]/15 p-3">
-                  <p className="text-xs font-semibold text-[var(--primary)] mb-1">💡 Explanation</p>
+                  <p className="text-xs font-semibold text-[var(--primary)] mb-1">Explanation</p>
                   <p className="text-xs text-[var(--fg-muted)] leading-relaxed">{q.explanation}</p>
                 </div>
               )}
               {selectedBookmark.notes && (
                 <div className="rounded-lg bg-amber-500/5 border border-amber-500/15 p-3">
-                  <p className="text-xs font-semibold text-amber-600 mb-1">📝 My Notes</p>
+                  <p className="text-xs font-semibold text-amber-600 mb-1">My Notes</p>
                   <p className="text-xs text-[var(--fg-muted)] leading-relaxed">{selectedBookmark.notes}</p>
                 </div>
               )}

@@ -70,7 +70,7 @@ export function PWAInstallPrompt() {
   }
 
   return (
-    <div className="fixed left-3 right-3 top-3 z-[110] mx-auto max-w-2xl rounded-2xl border border-[var(--primary)]/25 bg-[var(--bg-surface)]/95 p-3 shadow-lg backdrop-blur sm:left-1/2 sm:right-auto sm:w-[min(40rem,calc(100vw-2rem))] sm:-translate-x-1/2">
+        <div className="fixed left-3 right-3 top-3 z-[110] mx-auto max-w-2xl rounded-lg border border-[var(--primary)]/25 bg-[var(--bg-surface)]/95 p-3 shadow-lg backdrop-blur sm:left-1/2 sm:right-auto sm:w-[min(40rem,calc(100vw-2rem))] sm:-translate-x-1/2">
       <div className="flex items-start gap-3">
         <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[var(--primary)]/10 text-[var(--primary)]">
           {isiOS ? <Share className="h-4 w-4" /> : <Download className="h-4 w-4" />}

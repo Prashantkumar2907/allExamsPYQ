@@ -54,9 +54,7 @@ export default function RegisterPage() {
   return (
     <div className="h-dvh flex items-center justify-center p-4 bg-[var(--bg-body)] relative overflow-hidden">
       {/* Background decoration */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,var(--primary)/8,transparent_60%)]" />
-      <div className="absolute top-0 right-0 w-96 h-96 bg-[var(--primary)]/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
-      <div className="absolute bottom-0 left-0 w-72 h-72 bg-[var(--primary)]/5 rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl" />
+      <div className="absolute inset-0 bg-[linear-gradient(135deg,var(--primary-light),transparent_42%),repeating-linear-gradient(0deg,transparent,transparent_23px,var(--border)_24px)] opacity-60" />
 
       {/* Top bar */}
       <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
@@ -69,10 +67,10 @@ export default function RegisterPage() {
       </div>
 
       <div className="w-full max-w-md animate-fade-in relative">
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-6 shadow-lg">
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] p-6 shadow-lg">
           {/* Logo & Header */}
           <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-gradient-to-br from-[var(--primary)] to-[var(--primary-active)] mb-3 shadow-md">
+            <div className="inline-flex items-center justify-center h-14 w-14 rounded-lg bg-[var(--primary)] mb-3 shadow-md">
               <GraduationCap className="h-7 w-7 text-white" />
             </div>
             <h1 className="text-xl font-bold text-[var(--fg)]">{APP_NAME}</h1>
@@ -119,7 +117,7 @@ export default function RegisterPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
+                  placeholder="Password"
                   required
                   minLength={6}
                   autoComplete="new-password"
@@ -148,7 +146,7 @@ export default function RegisterPage() {
                     ))}
                   </div>
                   <p className="text-[11px] text-[var(--fg-subtle)]">
-                    {strengthLabels[passwordStrength]} {password.length < 6 && '— minimum 6 characters'}
+                    {strengthLabels[passwordStrength]} {password.length < 6 && '- minimum 6 characters'}
                   </p>
                 </div>
               )}

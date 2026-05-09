@@ -1,5 +1,5 @@
 import { useState, Component, type ReactNode } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 
@@ -29,6 +29,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 
 export function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation();
 
   return (
     <div className="h-dvh flex overflow-hidden">
@@ -48,7 +49,7 @@ export function AppLayout() {
         <Header onMenuClick={() => setSidebarOpen(true)} />
         <main className="flex-1 overflow-y-auto p-3 md:p-4">
           <ErrorBoundary>
-            <div className="animate-fade-in">
+            <div key={location.pathname} className="animate-page-in">
               <Outlet />
             </div>
           </ErrorBoundary>

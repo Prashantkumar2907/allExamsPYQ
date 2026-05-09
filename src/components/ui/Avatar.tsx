@@ -1,5 +1,6 @@
 import { cn } from '../../lib/utils';
 import { getAvatarUrl } from '../../lib/avatarConfig';
+import { useEffect, useState } from 'react';
 
 interface AvatarProps {
   src?: string | null;
@@ -22,6 +23,7 @@ const dotSizes = {
 };
 
 export function Avatar({ src, name, size = 'md', online, className }: AvatarProps) {
+  const [imageFailed, setImageFailed] = useState(false);
   const initials = name
     .split(' ')
     .map((n) => n[0])
@@ -30,6 +32,10 @@ export function Avatar({ src, name, size = 'md', online, className }: AvatarProp
     .slice(0, 2);
 
   const avatarUrl = src || getAvatarUrl('adventurer', name);
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [avatarUrl]);
 
   return (
     <div
@@ -40,19 +46,18 @@ export function Avatar({ src, name, size = 'md', online, className }: AvatarProp
       )}
     >
       <div className="h-full w-full rounded-full overflow-hidden ring-2 ring-[var(--border)] bg-[var(--primary)]/10">
-        <img
-          src={avatarUrl}
-          alt={name}
-          className="h-full w-full object-cover"
-          onError={(e) => {
-            const el = e.currentTarget;
-            el.style.display = 'none';
-            el.parentElement!.setAttribute('data-fallback', 'true');
-          }}
-        />
-        <div className="absolute inset-0 flex items-center justify-center font-semibold text-[var(--primary)] pointer-events-none opacity-0 data-[fallback=true]:opacity-100">
-          {initials}
-        </div>
+        {imageFailed ? (
+          <div className="absolute inset-0 flex items-center justify-center rounded-full font-semibold text-[var(--primary)]">
+            {initials}
+          </div>
+        ) : (
+          <img
+            src={avatarUrl}
+            alt={name}
+            className="h-full w-full object-cover"
+            onError={() => setImageFailed(true)}
+          />
+        )}
       </div>
       {online != null && (
         <span
