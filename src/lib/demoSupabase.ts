@@ -460,6 +460,31 @@ export const demoSupabase = {
     return new DemoQuery(table);
   },
   async rpc(functionName: string, params: Record<string, unknown>) {
+    if (functionName === 'get_leaderboard') {
+      const state = loadState();
+      const examId = String(params.p_exam_id ?? '');
+      const requestedLimit = Number(params.p_limit ?? 50);
+      const limit = Math.min(Math.max(Number.isFinite(requestedLimit) ? requestedLimit : 50, 1), 100);
+      const data = state.leaderboard_scores
+        .filter((row) => row.exam_id === examId)
+        .sort((a, b) => b.total_score - a.total_score || a.updated_at.localeCompare(b.updated_at))
+        .slice(0, limit)
+        .map((row) => {
+          const profile = state.profiles.find((item) => item.id === row.user_id);
+          return {
+            id: row.id,
+            user_id: row.user_id,
+            total_score: row.total_score,
+            tests_taken: row.tests_taken,
+            total_correct: row.total_correct,
+            total_questions: row.total_questions,
+            full_name: profile?.full_name ?? 'Anonymous',
+            avatar_url: profile?.avatar_url ?? null,
+          };
+        });
+      return { data, error: null };
+    }
+
     if (functionName !== 'record_leaderboard_attempt') {
       return { data: null, error: { message: `Unsupported demo RPC: ${functionName}` } };
     }

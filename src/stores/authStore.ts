@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { supabase } from '../lib/supabase';
 import { getErrorMessage, normalizeText } from '../lib/api';
 import type { Profile } from '../types/database';
@@ -22,9 +21,16 @@ interface AuthState {
   fetchProfile: (userId: string) => Promise<void>;
 }
 
+function clearLegacyAuthStorage() {
+  try {
+    localStorage.removeItem('auth-storage');
+  } catch {
+    // Auth still initializes from the Supabase client if storage is unavailable.
+  }
+}
+
 export const useAuthStore = create<AuthState>()(
-  persist(
-    (set, get) => ({
+  (set, get) => ({
       user: null,
       profile: null,
       session: null,
@@ -33,6 +39,8 @@ export const useAuthStore = create<AuthState>()(
       profileError: null,
 
       initialize: async () => {
+        clearLegacyAuthStorage();
+
         if (!authListenerRegistered) {
           authListenerRegistered = true;
           supabase.auth.onAuthStateChange(async (_event, session) => {
@@ -110,10 +118,5 @@ export const useAuthStore = create<AuthState>()(
         if (!error) await get().fetchProfile(userId);
         return { error: error?.message ?? null };
       },
-    }),
-    {
-      name: 'auth-storage',
-      partialize: (state) => ({ user: state.user, session: state.session }),
-    }
-  )
+    })
 );

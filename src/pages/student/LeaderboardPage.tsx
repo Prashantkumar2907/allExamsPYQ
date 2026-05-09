@@ -5,8 +5,10 @@ import { supabase } from '../../lib/supabase';
 import { Card } from '../../components/ui/Card';
 import { Avatar } from '../../components/ui/Avatar';
 import { EmptyState } from '../../components/shared/EmptyState';
+import { ErrorState } from '../../components/shared/ErrorState';
 import { cn } from '../../lib/utils';
-import { Trophy, Medal, Crown, TrendingUp, TrendingDown } from 'lucide-react';
+import { getErrorMessage } from '../../lib/api';
+import { Trophy, Medal, Crown } from 'lucide-react';
 
 interface LeaderboardEntry {
   id: string;
@@ -15,13 +17,15 @@ interface LeaderboardEntry {
   tests_taken: number;
   total_correct: number;
   total_questions: number;
-  profile: { full_name: string; avatar_url: string | null } | null;
+  full_name: string | null;
+  avatar_url: string | null;
 }
 
 export default function LeaderboardPage() {
   const { profile } = useAuthStore();
   const setPage = usePageStore((s) => s.setPage);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
 
   useEffect(() => {
@@ -31,13 +35,17 @@ export default function LeaderboardPage() {
 
   async function loadLeaderboard() {
     if (!profile?.exam_id) { setLoading(false); return; }
-    const { data } = await supabase
-      .from('leaderboard_scores')
-      .select('*, profile:profiles(full_name, avatar_url)')
-      .eq('exam_id', profile.exam_id)
-      .order('total_score', { ascending: false })
-      .limit(50);
-    if (data) setEntries(data as LeaderboardEntry[]);
+    setLoading(true);
+    setError('');
+    const { data, error: leaderboardError } = await supabase.rpc('get_leaderboard', {
+      p_exam_id: profile.exam_id,
+      p_limit: 50,
+    });
+    if (leaderboardError) {
+      setError(getErrorMessage(leaderboardError, 'Unable to load leaderboard.'));
+    } else {
+      setEntries((data || []) as LeaderboardEntry[]);
+    }
     setLoading(false);
   }
 
@@ -52,6 +60,7 @@ export default function LeaderboardPage() {
       </div>
     </div>
   );
+  if (error) return <ErrorState description={error} onRetry={loadLeaderboard} />;
   if (!entries.length) {
     return <EmptyState icon={Trophy} title="No rankings yet" description="Complete tests to appear on the leaderboard." />;
   }
@@ -99,9 +108,9 @@ export default function LeaderboardPage() {
                 )}>
                   <Icon className={cn('h-5 w-5', iconColors[i])} />
                 </div>
-                <Avatar name={e.profile?.full_name || 'U'} src={e.profile?.avatar_url || undefined} size="md" />
+                <Avatar name={e.full_name || 'U'} src={e.avatar_url || undefined} size="md" />
                 <p className="text-xs font-semibold text-[var(--fg)] mt-2 truncate max-w-full px-2">
-                  {e.profile?.full_name || 'Anonymous'}
+                  {e.full_name || 'Anonymous'}
                 </p>
                 <p className="text-lg font-bold text-[var(--primary)] mt-0.5">{e.total_score}</p>
                 <p className="text-[10px] text-[var(--fg-muted)]">{e.tests_taken} tests</p>
@@ -137,13 +146,13 @@ export default function LeaderboardPage() {
               >
                 {rank}
               </span>
-              <Avatar name={e.profile?.full_name || 'U'} src={e.profile?.avatar_url || undefined} size="sm" />
+              <Avatar name={e.full_name || 'U'} src={e.avatar_url || undefined} size="sm" />
               <div className="flex-1 min-w-0">
                 <p className={cn('text-sm font-medium truncate', isUser ? 'text-[var(--primary)]' : 'text-[var(--fg)]')}>
-                  {e.profile?.full_name || 'Anonymous'}
+                  {e.full_name || 'Anonymous'}
                   {isUser && <span className="ml-1.5 text-[10px] font-normal text-[var(--fg-muted)]">(You)</span>}
                 </p>
-                <p className="text-[11px] text-[var(--fg-muted)]">{e.tests_taken} tests · {accuracy}% accuracy</p>
+                <p className="text-[11px] text-[var(--fg-muted)]">{e.tests_taken} tests - {accuracy}% accuracy</p>
               </div>
               <span className="text-sm font-bold text-[var(--fg)]">{e.total_score}</span>
             </div>
