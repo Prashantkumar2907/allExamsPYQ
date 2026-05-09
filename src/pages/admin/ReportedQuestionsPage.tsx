@@ -6,12 +6,16 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Input } from '../../components/ui/Input';
 import { EmptyState } from '../../components/shared/EmptyState';
+import { ErrorState } from '../../components/shared/ErrorState';
+import { toast } from '../../components/ui/Toast';
+import { getErrorMessage } from '../../lib/api';
 import { cn, formatDate } from '../../lib/utils';
-import { Flag, CheckCircle, XCircle, Eye } from 'lucide-react';
+import { Flag, CheckCircle, XCircle } from 'lucide-react';
 
 interface ReportItem {
   id: string;
   reason: string;
+  description: string | null;
   status: 'pending' | 'reviewed' | 'resolved' | 'dismissed';
   admin_notes: string | null;
   created_at: string;
@@ -23,28 +27,50 @@ interface ReportItem {
 export default function ReportedQuestionsPage() {
   const setPage = usePageStore((s) => s.setPage);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [adminNotes, setAdminNotes] = useState<Record<string, string>>({});
+  const [updatingId, setUpdatingId] = useState('');
 
-  useEffect(() => { setPage('Reported Questions', 'Review flagged questions'); loadReports(); }, []);
+  useEffect(() => {
+    setPage('Reported Questions', 'Review flagged questions');
+    void loadReports();
+  }, []);
 
-  async function loadReports() {
-    const { data } = await supabase
-      .from('reported_questions')
-      .select('*, question:questions(question_text), profile:profiles(full_name, email)')
-      .order('created_at', { ascending: false })
-      .limit(100);
-    if (data) setReports(data as ReportItem[]);
-    setLoading(false);
+  async function loadReports(showLoading = true) {
+    if (showLoading) setLoading(true);
+    setError('');
+    try {
+      const { data, error: reportsError } = await supabase
+        .from('reported_questions')
+        .select('*, question:questions(question_text), profile:profiles(full_name, email)')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (reportsError) throw reportsError;
+      setReports((data || []) as ReportItem[]);
+    } catch (err) {
+      setError(getErrorMessage(err, 'Unable to load reported questions.'));
+    } finally {
+      if (showLoading) setLoading(false);
+    }
   }
 
   async function updateStatus(id: string, status: 'resolved' | 'dismissed') {
-    await supabase.from('reported_questions').update({
-      status,
-      admin_notes: adminNotes[id] || null,
-      resolved_at: new Date().toISOString(),
-    }).eq('id', id);
-    loadReports();
+    setUpdatingId(id);
+    try {
+      const { error: updateError } = await supabase.from('reported_questions').update({
+        status,
+        admin_notes: adminNotes[id] || null,
+        resolved_at: new Date().toISOString(),
+      }).eq('id', id);
+      if (updateError) throw updateError;
+      toast.success(status === 'resolved' ? 'Report resolved.' : 'Report dismissed.');
+      await loadReports(false);
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Could not update this report.'));
+    } finally {
+      setUpdatingId('');
+    }
   }
 
   if (loading) {
@@ -55,6 +81,7 @@ export default function ReportedQuestionsPage() {
       </div>
     );
   }
+  if (error) return <ErrorState description={error} onRetry={() => loadReports()} />;
 
   const pending = reports.filter((r) => r.status === 'pending' || r.status === 'reviewed');
   const resolved = reports.filter((r) => r.status === 'resolved' || r.status === 'dismissed');
@@ -86,19 +113,25 @@ export default function ReportedQuestionsPage() {
         <p className="text-[10px] text-[var(--fg-muted)] bg-[var(--bg-surface)] rounded px-2 py-1 mt-1">
           <span className="font-medium">Reason:</span> {r.reason}
         </p>
+        {r.description && (
+          <p className="text-[10px] text-[var(--fg-muted)] bg-[var(--bg-surface)] rounded px-2 py-1 mt-1">
+            <span className="font-medium">Details:</span> {r.description}
+          </p>
+        )}
         {isPending && (
           <div className="mt-2 space-y-1.5">
-            <input
+            <Input
+              label="Admin notes"
               value={adminNotes[r.id] || ''}
               onChange={(e) => setAdminNotes({ ...adminNotes, [r.id]: e.target.value })}
-              placeholder="Admin notes (optional)..."
-              className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-[10px] text-[var(--fg)] focus:outline-none focus:ring-1 focus:ring-[var(--primary)]/40"
+              placeholder="Optional resolution note"
+              className="h-8 text-[11px]"
             />
             <div className="flex gap-2">
-              <Button size="sm" className="bg-[var(--success)] hover:bg-[var(--success)]/90 text-white" onClick={() => updateStatus(r.id, 'resolved')}>
+              <Button size="sm" className="bg-[var(--success)] hover:bg-[var(--success)]/90 text-white" onClick={() => updateStatus(r.id, 'resolved')} loading={updatingId === r.id}>
                 <CheckCircle className="h-3 w-3 mr-1" /> Resolve
               </Button>
-              <Button size="sm" variant="secondary" className="hover:bg-red-500/10 hover:text-red-500" onClick={() => updateStatus(r.id, 'dismissed')}>
+              <Button size="sm" variant="secondary" className="hover:bg-red-500/10 hover:text-red-500" onClick={() => updateStatus(r.id, 'dismissed')} disabled={updatingId === r.id}>
                 <XCircle className="h-3 w-3 mr-1" /> Dismiss
               </Button>
             </div>

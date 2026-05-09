@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useBlocker } from 'react-router';
 import { useAuthStore } from '../../stores/authStore';
 import { usePageStore } from '../../stores/pageStore';
 import { supabase } from '../../lib/supabase';
@@ -38,11 +39,22 @@ export default function TestTakingPage() {
   const [timeLeft, setTimeLeft] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitPromptOpen, setSubmitPromptOpen] = useState(false);
+  const [leavePromptOpen, setLeavePromptOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const attemptRef = useRef<TestAttempt | null>(null);
   const questionsRef = useRef<Question[]>([]);
   const answersRef = useRef<Record<string, string | null>>({});
   const submittingRef = useRef(false);
+  const allowNavigationRef = useRef(false);
+  const blocker = useBlocker(({ currentLocation, nextLocation }) =>
+    Boolean(
+      attempt &&
+        questions.length > 0 &&
+        !submittingRef.current &&
+        !allowNavigationRef.current &&
+        currentLocation.pathname !== nextLocation.pathname
+    )
+  );
 
   useEffect(() => {
     questionsRef.current = questions;
@@ -51,6 +63,20 @@ export default function TestTakingPage() {
   useEffect(() => {
     answersRef.current = answers;
   }, [answers]);
+
+  useEffect(() => {
+    if (blocker.state === 'blocked') setLeavePromptOpen(true);
+  }, [blocker.state]);
+
+  useEffect(() => {
+    if (!attempt || !questions.length || submitting) return;
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [attempt, questions.length, submitting]);
 
   useEffect(() => {
     setPage('Test', '');
@@ -72,6 +98,7 @@ export default function TestTakingPage() {
       if (attemptError) throw attemptError;
       if (!att) throw new Error('This test attempt could not be found.');
       if (att.status === 'completed') {
+        allowNavigationRef.current = true;
         navigate(`/result/${attemptId}`);
         return;
       }
@@ -242,6 +269,7 @@ export default function TestTakingPage() {
         if (leaderboardError) toast.warning(getErrorMessage(leaderboardError, 'Leaderboard could not be updated.'));
       }
 
+      allowNavigationRef.current = true;
       navigate(`/result/${attemptId}`);
     } catch (err) {
       toast.error(getErrorMessage(err, 'Could not submit this test.'));
@@ -435,6 +463,21 @@ export default function TestTakingPage() {
         }}
         loading={submitting}
         variant="primary"
+      />
+      <ConfirmDialog
+        open={leavePromptOpen}
+        onOpenChange={(open) => {
+          setLeavePromptOpen(open);
+          if (!open && blocker.state === 'blocked') blocker.reset();
+        }}
+        title="Leave test?"
+        description="Your saved answers will remain, but the timer keeps running until you submit the test."
+        confirmLabel="Leave"
+        onConfirm={() => {
+          allowNavigationRef.current = true;
+          setLeavePromptOpen(false);
+          if (blocker.state === 'blocked') blocker.proceed();
+        }}
       />
     </div>
   );

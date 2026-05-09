@@ -22,8 +22,26 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (!id.includes('node_modules')) return undefined;
-          if (id.includes('recharts') || id.includes('d3-')) return 'charts';
+          const normalizedId = id.replace(/\\/g, '/');
+          if (normalizedId.includes('commonjsHelpers')) return 'vendor-helpers';
+          if (normalizedId.includes('/node_modules/tslib/')) return 'vendor-helpers';
+          if (
+            normalizedId.includes('/src/components/ui/Button.tsx') ||
+            normalizedId.includes('/src/lib/constants.ts') ||
+            normalizedId.includes('/src/lib/utils.ts') ||
+            normalizedId.includes('/src/stores/themeStore.ts')
+          ) return 'ui-core';
+          if (!normalizedId.includes('/node_modules/')) return undefined;
+          if (
+            normalizedId.includes('/node_modules/clsx/') ||
+            normalizedId.includes('/node_modules/tailwind-merge/') ||
+            normalizedId.includes('/node_modules/class-variance-authority/') ||
+            normalizedId.includes('/node_modules/zustand/')
+          ) return 'ui-core';
+          if (
+            normalizedId.includes('/node_modules/recharts/') ||
+            /\/node_modules\/d3-[^/]+\//.test(normalizedId)
+          ) return 'charts';
           if (id.includes('@supabase')) return 'supabase';
           if (id.includes('@radix-ui')) return 'radix-ui';
           if (id.includes('lucide-react')) return 'icons';

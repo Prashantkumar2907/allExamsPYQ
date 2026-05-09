@@ -1,5 +1,12 @@
 import { useEffect, lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import {
+  createBrowserRouter,
+  createRoutesFromElements,
+  RouterProvider,
+  Route,
+  Navigate,
+  Outlet,
+} from 'react-router-dom';
 import { useAuthStore } from './stores/authStore';
 import { AppLayout } from './components/layout/AppLayout';
 import { LoadingSpinner } from './components/shared/LoadingSpinner';
@@ -63,6 +70,52 @@ function RoleGuard({ role }: { role: 'student' | 'admin' }) {
   return <Outlet />;
 }
 
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <>
+      {/* Guest routes */}
+      <Route element={<GuestGuard />}>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+      </Route>
+
+      {/* Authenticated routes */}
+      <Route element={<AuthGuard />}>
+        <Route element={<AppLayout />}>
+          {/* Student routes */}
+          <Route element={<RoleGuard role="student" />}>
+            <Route path="/dashboard" element={<StudentDashboard />} />
+            <Route path="/exams" element={<ExamBrowser />} />
+            <Route path="/tests" element={<TestList />} />
+            <Route path="/test/:attemptId" element={<TestTaking />} />
+            <Route path="/result/:attemptId" element={<TestResult />} />
+            <Route path="/analytics" element={<Analytics />} />
+            <Route path="/leaderboard" element={<Leaderboard />} />
+            <Route path="/bookmarks" element={<Bookmarks />} />
+            <Route path="/profile" element={<StudentProfile />} />
+          </Route>
+
+          {/* Admin routes */}
+          <Route element={<RoleGuard role="admin" />}>
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/exams" element={<ExamManagement />} />
+            <Route path="/admin/questions" element={<QuestionManagement />} />
+            <Route path="/admin/tests" element={<TestManagement />} />
+            <Route path="/admin/upload" element={<BulkUpload />} />
+            <Route path="/admin/reports" element={<ReportedQuestions />} />
+            <Route path="/admin/users" element={<UserAnalytics />} />
+            <Route path="/admin/profile" element={<AdminProfile />} />
+          </Route>
+        </Route>
+      </Route>
+
+      {/* Catch all */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </>
+  )
+);
+
 export default function App() {
   const { initialize } = useAuthStore();
 
@@ -71,52 +124,12 @@ export default function App() {
   }, [initialize]);
 
   return (
-    <BrowserRouter>
+    <>
       <PWAInstallPrompt />
       <ToastContainer />
       <Suspense fallback={<LoadingSpinner />}>
-        <Routes>
-          {/* Guest routes */}
-          <Route element={<GuestGuard />}>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-          </Route>
-
-          {/* Authenticated routes */}
-          <Route element={<AuthGuard />}>
-            <Route element={<AppLayout />}>
-              {/* Student routes */}
-              <Route element={<RoleGuard role="student" />}>
-                <Route path="/dashboard" element={<StudentDashboard />} />
-                <Route path="/exams" element={<ExamBrowser />} />
-                <Route path="/tests" element={<TestList />} />
-                <Route path="/test/:attemptId" element={<TestTaking />} />
-                <Route path="/result/:attemptId" element={<TestResult />} />
-                <Route path="/analytics" element={<Analytics />} />
-                <Route path="/leaderboard" element={<Leaderboard />} />
-                <Route path="/bookmarks" element={<Bookmarks />} />
-                <Route path="/profile" element={<StudentProfile />} />
-              </Route>
-
-              {/* Admin routes */}
-              <Route element={<RoleGuard role="admin" />}>
-                <Route path="/admin" element={<AdminDashboard />} />
-                <Route path="/admin/exams" element={<ExamManagement />} />
-                <Route path="/admin/questions" element={<QuestionManagement />} />
-                <Route path="/admin/tests" element={<TestManagement />} />
-                <Route path="/admin/upload" element={<BulkUpload />} />
-                <Route path="/admin/reports" element={<ReportedQuestions />} />
-                <Route path="/admin/users" element={<UserAnalytics />} />
-                <Route path="/admin/profile" element={<AdminProfile />} />
-              </Route>
-            </Route>
-          </Route>
-
-          {/* Catch all */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <RouterProvider router={router} />
       </Suspense>
-    </BrowserRouter>
+    </>
   );
 }

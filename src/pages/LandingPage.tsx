@@ -78,7 +78,7 @@ export default function LandingPage() {
               <div className="h-10 w-10 rounded-lg bg-[var(--primary)]/10 flex items-center justify-center mb-3 group-hover:bg-[var(--primary)]/15 group-hover:scale-105 transition duration-200">
                 <f.icon className="h-5 w-5 text-[var(--primary)]" />
               </div>
-              <h3 className="text-sm font-semibold text-[var(--fg)] mb-1">{f.title}</h3>
+              <h2 className="text-sm font-semibold text-[var(--fg)] mb-1">{f.title}</h2>
               <p className="text-sm text-[var(--fg-muted)] leading-relaxed">{f.description}</p>
             </div>
           ))}

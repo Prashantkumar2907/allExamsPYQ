@@ -467,6 +467,161 @@ function emitAuth(event: string, session: ReturnType<typeof createSession> | nul
   listeners.forEach((listener) => void listener(event, session));
 }
 
+function getCurrentProfile(state: DemoState) {
+  const session = readSession();
+  const userId = session?.user?.id;
+  if (!userId) return null;
+  return state.profiles.find((profile) => profile.id === userId) ?? null;
+}
+
+function getTopicExamId(state: DemoState, topicId: string) {
+  const topic = state.topics.find((item) => item.id === topicId);
+  const chapter = state.chapters.find((item) => item.id === topic?.chapter_id);
+  const subject = state.subjects.find((item) => item.id === chapter?.subject_id);
+  return subject?.exam_id ?? null;
+}
+
+function createAttemptWithAnswers(
+  state: DemoState,
+  attemptPayload: DemoRow,
+  questionIds: string[]
+) {
+  const attempt = defaultsFor('test_attempts', attemptPayload) as unknown as DemoState['test_attempts'][number];
+  state.test_attempts.push(attempt);
+  questionIds.forEach((questionId) => {
+    state.user_answers.push(defaultsFor('user_answers', {
+      attempt_id: attempt.id,
+      question_id: questionId,
+      time_spent_seconds: 0,
+    }) as unknown as DemoState['user_answers'][number]);
+  });
+  saveState(state);
+  return attempt.id;
+}
+
+function startDemoTestAttempt(params: Record<string, unknown>): QueryResult<string> {
+  const state = loadState();
+  const profile = getCurrentProfile(state);
+  if (!profile) return { data: null, error: { message: 'Authentication required' } };
+
+  const testId = String(params.p_test_id ?? '');
+  const test = state.tests.find((item) => item.id === testId);
+  const nowMs = Date.now();
+  const opensAt = test?.scheduled_at ? new Date(test.scheduled_at).getTime() : null;
+  const closesAt = test?.scheduled_end_at ? new Date(test.scheduled_end_at).getTime() : null;
+
+  if (
+    !test ||
+    test.status !== 'active' ||
+    (opensAt != null && nowMs < opensAt) ||
+    (closesAt != null && nowMs > closesAt) ||
+    (!test.is_global && test.exam_id !== profile.exam_id)
+  ) {
+    return { data: null, error: { message: 'This test is not available.' } };
+  }
+
+  if (!test.allow_multiple_attempts) {
+    const completed = state.test_attempts.some(
+      (attempt) => attempt.user_id === profile.id && attempt.test_id === test.id && attempt.status === 'completed'
+    );
+    if (completed) {
+      return { data: null, error: { message: 'You have already completed this test.' } };
+    }
+  }
+
+  const questionIds = state.test_questions
+    .filter((row) => row.test_id === test.id)
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((row) => row.question_id);
+
+  if (questionIds.length === 0) {
+    return { data: null, error: { message: 'This test does not have questions assigned yet.' } };
+  }
+
+  const attemptQuestionIds = test.shuffle_questions
+    ? [...questionIds].sort(() => Math.random() - 0.5)
+    : questionIds;
+
+  const attemptId = createAttemptWithAnswers(state, {
+    user_id: profile.id,
+    test_id: test.id,
+    source_type: 'test',
+    source_id: test.id,
+    source_name: test.title,
+    total_questions: attemptQuestionIds.length,
+    total_marks: test.total_marks,
+    duration_minutes: test.duration_minutes,
+    status: 'in_progress',
+  }, attemptQuestionIds);
+
+  return { data: attemptId, error: null };
+}
+
+function startDemoPracticeAttempt(params: Record<string, unknown>): QueryResult<string> {
+  const state = loadState();
+  const profile = getCurrentProfile(state);
+  if (!profile) return { data: null, error: { message: 'Authentication required' } };
+  if (!profile.exam_id) return { data: null, error: { message: 'Select an exam before starting practice.' } };
+
+  const sourceType = String(params.p_source_type ?? '');
+  const sourceId = String(params.p_source_id ?? '');
+  let sourceName = '';
+  let sourceExamId: string | null = null;
+  let topicIds: string[] = [];
+
+  if (sourceType === 'topic') {
+    const topic = state.topics.find((item) => item.id === sourceId);
+    sourceName = topic?.name ?? '';
+    sourceExamId = getTopicExamId(state, sourceId);
+    topicIds = topic ? [topic.id] : [];
+  } else if (sourceType === 'chapter') {
+    const chapter = state.chapters.find((item) => item.id === sourceId);
+    const subject = state.subjects.find((item) => item.id === chapter?.subject_id);
+    sourceName = chapter?.name ?? '';
+    sourceExamId = subject?.exam_id ?? null;
+    topicIds = state.topics.filter((topic) => topic.chapter_id === sourceId).map((topic) => topic.id);
+  } else if (sourceType === 'subject') {
+    const subject = state.subjects.find((item) => item.id === sourceId);
+    const chapterIds = state.chapters
+      .filter((chapter) => chapter.subject_id === sourceId)
+      .map((chapter) => chapter.id);
+    sourceName = subject?.name ?? '';
+    sourceExamId = subject?.exam_id ?? null;
+    topicIds = state.topics.filter((topic) => chapterIds.includes(topic.chapter_id)).map((topic) => topic.id);
+  } else {
+    return { data: null, error: { message: 'Unsupported practice source type.' } };
+  }
+
+  if (!sourceName) return { data: null, error: { message: 'Practice source not found.' } };
+  if (sourceExamId !== profile.exam_id) {
+    return { data: null, error: { message: 'This practice content is not available for your exam.' } };
+  }
+
+  const questions = state.questions
+    .filter((question) => topicIds.includes(question.topic_id) && question.is_active)
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .slice(0, 20);
+
+  if (questions.length === 0) {
+    return { data: null, error: { message: 'No active questions found for this selection yet.' } };
+  }
+
+  const totalMarks = questions.reduce((sum, question) => sum + question.marks, 0);
+  const attemptId = createAttemptWithAnswers(state, {
+    user_id: profile.id,
+    test_id: null,
+    source_type: sourceType,
+    source_id: sourceId,
+    source_name: sourceName,
+    total_questions: questions.length,
+    total_marks: totalMarks,
+    duration_minutes: Math.max(questions.length * 2, 10),
+    status: 'in_progress',
+  }, questions.map((question) => question.id));
+
+  return { data: attemptId, error: null };
+}
+
 export const demoSupabase = {
   from(table: DemoTableName) {
     return new DemoQuery(table);
@@ -495,6 +650,14 @@ export const demoSupabase = {
           };
         });
       return { data, error: null };
+    }
+
+    if (functionName === 'start_test_attempt') {
+      return startDemoTestAttempt(params);
+    }
+
+    if (functionName === 'start_practice_attempt') {
+      return startDemoPracticeAttempt(params);
     }
 
     if (functionName !== 'record_leaderboard_attempt') {

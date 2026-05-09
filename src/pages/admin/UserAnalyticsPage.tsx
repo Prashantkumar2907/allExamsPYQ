@@ -7,7 +7,10 @@ import { Badge } from '../../components/ui/Badge';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { EmptyState } from '../../components/shared/EmptyState';
-import { cn, formatDate } from '../../lib/utils';
+import { ErrorState } from '../../components/shared/ErrorState';
+import { toast } from '../../components/ui/Toast';
+import { getErrorMessage } from '../../lib/api';
+import { formatDate } from '../../lib/utils';
 import { Users, Search } from 'lucide-react';
 
 interface StudentProfile {
@@ -26,6 +29,8 @@ interface StudentProfile {
 export default function UserAnalyticsPage() {
   const setPage = usePageStore((s) => s.setPage);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState('');
   const [students, setStudents] = useState<StudentProfile[]>([]);
   const [search, setSearch] = useState('');
   const [hasMore, setHasMore] = useState(false);
@@ -33,22 +38,37 @@ export default function UserAnalyticsPage() {
 
   const PAGE_SIZE = 50;
 
-  useEffect(() => { setPage('User Analytics', 'Monitor student performance'); loadStudents(); }, []);
+  useEffect(() => {
+    setPage('User Analytics', 'Monitor student performance');
+    void loadStudents();
+  }, []);
 
   async function loadStudents(append = false) {
     const from = append ? students.length : 0;
-    const { data, count } = await supabase
-      .from('profiles')
-      .select('*, exam:exams(name)', { count: 'exact' })
-      .eq('role', 'student')
-      .order('created_at', { ascending: false })
-      .range(from, from + PAGE_SIZE - 1);
-    if (data) {
-      setStudents(prev => append ? [...prev, ...(data as StudentProfile[])] : data as StudentProfile[]);
-      setHasMore(data.length === PAGE_SIZE);
+    if (append) setLoadingMore(true);
+    else setLoading(true);
+    setError('');
+    try {
+      const { data, count, error: studentsError } = await supabase
+        .from('profiles')
+        .select('*, exam:exams(name)', { count: 'exact' })
+        .eq('role', 'student')
+        .order('created_at', { ascending: false })
+        .range(from, from + PAGE_SIZE - 1);
+      if (studentsError) throw studentsError;
+      if (data) {
+        setStudents(prev => append ? [...prev, ...(data as StudentProfile[])] : data as StudentProfile[]);
+        setHasMore(data.length === PAGE_SIZE);
+      }
+      if (count != null) setTotalCount(count);
+    } catch (err) {
+      const message = getErrorMessage(err, 'Unable to load students.');
+      if (append) toast.error(message);
+      else setError(message);
+    } finally {
+      if (append) setLoadingMore(false);
+      else setLoading(false);
     }
-    if (count != null) setTotalCount(count);
-    setLoading(false);
   }
 
   if (loading) {
@@ -62,6 +82,7 @@ export default function UserAnalyticsPage() {
       </div>
     );
   }
+  if (error) return <ErrorState description={error} onRetry={() => loadStudents()} />;
 
   const filtered = search
     ? students.filter(
@@ -82,16 +103,14 @@ export default function UserAnalyticsPage() {
       </div>
 
       {/* Search */}
-      <Card className="!p-0 overflow-hidden">
-        <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--fg-muted)]" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or email..."
-            className="w-full pl-10 pr-4 py-3 rounded-xl bg-transparent text-sm text-[var(--fg)] focus:outline-none placeholder:text-[var(--fg-muted)]"
-          />
-        </div>
+      <Card>
+        <Input
+          aria-label="Search students by name or email"
+          icon={Search}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name or email..."
+        />
       </Card>
 
       {filtered.length === 0 ? (
@@ -115,7 +134,7 @@ export default function UserAnalyticsPage() {
           ))}
           {hasMore && !search && (
             <div className="flex justify-center pt-2">
-              <Button variant="ghost" size="sm" onClick={() => loadStudents(true)}>
+              <Button variant="ghost" size="sm" onClick={() => loadStudents(true)} loading={loadingMore}>
                 Load More
               </Button>
             </div>

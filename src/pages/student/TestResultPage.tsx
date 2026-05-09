@@ -356,12 +356,13 @@ export default function TestResultPage() {
       {/* Bookmark Dialog */}
       <Dialog open={bookmarkDialogOpen} onOpenChange={setBookmarkDialogOpen} title="Bookmark Question" description="Add a note to help you remember why you bookmarked this.">
         <div className="space-y-3">
-          <textarea
+          <Textarea
+            id="bookmark-note"
+            label="Bookmark note (optional)"
             value={bookmarkNote}
             onChange={(e) => setBookmarkNote(e.target.value)}
             rows={3}
-            placeholder="Add a note (optional)..."
-            className="w-full px-3 py-2 text-sm rounded-lg border border-[var(--border)] bg-[var(--bg-body)] text-[var(--fg)] placeholder:text-[var(--fg-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30 focus:border-[var(--primary)]/50 transition resize-none"
+            placeholder="Add a note that will help during revision."
           />
           <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
             <Button variant="secondary" size="sm" onClick={() => setBookmarkDialogOpen(false)}>Cancel</Button>

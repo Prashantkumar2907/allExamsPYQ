@@ -105,71 +105,26 @@ export default function TestListPage() {
     if (!profile) return;
     setStartingTestId(test.id);
     try {
-      const { data: existing, error: existingError } = await supabase
-        .from('test_attempts')
-        .select('id')
-        .eq('user_id', profile.id)
-        .eq('test_id', test.id)
-        .eq('status', 'completed')
-        .limit(1);
+      const { data: attemptId, error: startError } = await supabase.rpc('start_test_attempt', {
+        p_test_id: test.id,
+      });
 
-      if (existingError) throw existingError;
+      if (startError) throw startError;
+      if (!attemptId) throw new Error('Could not create a test attempt.');
 
-      if (existing && existing.length > 0 && !test.allow_multiple_attempts) {
+      navigate(`/test/${attemptId as string}`);
+    } catch (err) {
+      const message = getErrorMessage(err, 'Unable to start this test.');
+      if (message.includes('already completed')) {
         setCompletedTestIds((prev) => new Set(prev).add(test.id));
         toast.info('You have already completed this test.');
         return;
       }
-
-      const { data: tqs, error: questionsError } = await supabase
-        .from('test_questions')
-        .select('question_id')
-        .eq('test_id', test.id)
-        .order('sort_order');
-
-      if (questionsError) throw questionsError;
-
-      const questionIds = tqs?.map((q) => q.question_id) ?? [];
-      if (questionIds.length === 0) {
-        toast.warning('This test does not have questions assigned yet.');
+      if (message.includes('does not have questions')) {
+        toast.warning(message);
         return;
       }
-
-      const attemptQuestionIds = test.shuffle_questions
-        ? [...questionIds].sort(() => Math.random() - 0.5)
-        : questionIds;
-
-      const { data: attempt, error: attemptError } = await supabase
-        .from('test_attempts')
-        .insert({
-          user_id: profile.id,
-          test_id: test.id,
-          source_type: 'test' as const,
-          source_id: test.id,
-          source_name: test.title,
-          total_questions: attemptQuestionIds.length,
-          total_marks: test.total_marks,
-          duration_minutes: test.duration_minutes,
-          status: 'in_progress' as const,
-        })
-        .select()
-        .single();
-
-      if (attemptError) throw attemptError;
-      if (!attempt) throw new Error('Could not create a test attempt.');
-
-      const { error: answersError } = await supabase.from('user_answers').insert(
-        attemptQuestionIds.map((qid) => ({
-          attempt_id: attempt.id,
-          question_id: qid,
-          time_spent_seconds: 0,
-        }))
-      );
-
-      if (answersError) throw answersError;
-      navigate(`/test/${attempt.id}`);
-    } catch (err) {
-      toast.error(getErrorMessage(err, 'Unable to start this test.'));
+      toast.error(message);
     } finally {
       setStartingTestId('');
     }
@@ -205,6 +160,7 @@ export default function TestListPage() {
 
   const renderTestCard = (test: Test) => {
     const isCompleted = completedTestIds.has(test.id);
+    const isLockedAfterCompletion = isCompleted && !test.allow_multiple_attempts;
     const availability = getAvailability(test);
     return (
       <Card key={test.id} className="hover:border-[var(--border-strong)] transition duration-150">
@@ -217,7 +173,7 @@ export default function TestListPage() {
               <span className="flex items-center gap-1 text-[11px] text-[var(--fg-muted)]"><Award className="h-3 w-3" />{test.total_marks} marks</span>
             </div>
           </div>
-          {isCompleted ? (
+          {isLockedAfterCompletion ? (
             <Badge variant="success"><CheckCircle className="h-3 w-3 mr-0.5" />Done</Badge>
           ) : (
             <Button
@@ -226,7 +182,7 @@ export default function TestListPage() {
               disabled={!availability.available}
               loading={startingTestId === test.id}
             >
-              <Play className="h-3.5 w-3.5" /> {availability.label}
+              <Play className="h-3.5 w-3.5" /> {isCompleted && availability.available ? 'Retake' : availability.label}
             </Button>
           )}
         </div>

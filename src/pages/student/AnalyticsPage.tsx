@@ -4,8 +4,10 @@ import { usePageStore } from '../../stores/pageStore';
 import { supabase } from '../../lib/supabase';
 import { Card, CardHeader, CardTitle } from '../../components/ui/Card';
 import { EmptyState } from '../../components/shared/EmptyState';
+import { ErrorState } from '../../components/shared/ErrorState';
 import { CHART_COLORS } from '../../lib/constants';
-import { cn, getAccuracy } from '../../lib/utils';
+import { getErrorMessage } from '../../lib/api';
+import { getAccuracy } from '../../lib/utils';
 import { BarChart3 } from 'lucide-react';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
@@ -24,22 +26,36 @@ export default function AnalyticsPage() {
   const { profile } = useAuthStore();
   const setPage = usePageStore((s) => s.setPage);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [attempts, setAttempts] = useState<TestAttempt[]>([]);
 
   useEffect(() => {
     setPage('Analytics', 'Track your performance');
+  }, [setPage]);
+
+  useEffect(() => {
+    if (!profile) return;
     loadAttempts();
-  }, []);
+  }, [profile]);
 
   async function loadAttempts() {
-    const { data } = await supabase
-      .from('test_attempts')
-      .select('*')
-      .eq('user_id', profile!.id)
-      .eq('status', 'completed')
-      .order('completed_at', { ascending: true });
-    if (data) setAttempts(data);
-    setLoading(false);
+    if (!profile) return;
+    setLoading(true);
+    setError('');
+    try {
+      const { data, error: attemptsError } = await supabase
+        .from('test_attempts')
+        .select('*')
+        .eq('user_id', profile.id)
+        .eq('status', 'completed')
+        .order('completed_at', { ascending: true });
+      if (attemptsError) throw attemptsError;
+      setAttempts(data || []);
+    } catch (err) {
+      setError(getErrorMessage(err, 'Unable to load analytics.'));
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (loading) return (
@@ -53,6 +69,7 @@ export default function AnalyticsPage() {
       </div>
     </div>
   );
+  if (error) return <ErrorState description={error} onRetry={loadAttempts} />;
   if (!attempts.length) {
     return <EmptyState icon={BarChart3} title="No analytics yet" description="Complete tests to see your performance analytics." />;
   }

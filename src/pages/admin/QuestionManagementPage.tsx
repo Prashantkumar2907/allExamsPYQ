@@ -317,19 +317,19 @@ export default function QuestionManagementPage() {
       <Card>
         <p className="text-xs font-semibold text-[var(--fg-muted)] uppercase tracking-wider mb-2.5">Filter Questions</p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <select value={filterExam} onChange={(e) => setFilterExam(e.target.value)} className="text-xs rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 text-[var(--fg)] focus:ring-2 focus:ring-[var(--primary)]/40 focus:outline-none">
+          <select aria-label="Filter by exam" value={filterExam} onChange={(e) => setFilterExam(e.target.value)} className="text-xs rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 text-[var(--fg)] focus:ring-2 focus:ring-[var(--primary)]/40 focus:outline-none">
             <option value="">All Exams</option>
             {exams.map((e) => <option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
-          <select value={filterSubject} onChange={(e) => setFilterSubject(e.target.value)} className="text-xs rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 text-[var(--fg)] focus:ring-2 focus:ring-[var(--primary)]/40 focus:outline-none" disabled={!filterExam}>
+          <select aria-label="Filter by subject" value={filterSubject} onChange={(e) => setFilterSubject(e.target.value)} className="text-xs rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 text-[var(--fg)] focus:ring-2 focus:ring-[var(--primary)]/40 focus:outline-none" disabled={!filterExam}>
             <option value="">All Subjects</option>
             {subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
-          <select value={filterChapter} onChange={(e) => setFilterChapter(e.target.value)} className="text-xs rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 text-[var(--fg)] focus:ring-2 focus:ring-[var(--primary)]/40 focus:outline-none" disabled={!filterSubject}>
+          <select aria-label="Filter by chapter" value={filterChapter} onChange={(e) => setFilterChapter(e.target.value)} className="text-xs rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 text-[var(--fg)] focus:ring-2 focus:ring-[var(--primary)]/40 focus:outline-none" disabled={!filterSubject}>
             <option value="">All Chapters</option>
             {chapters.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
-          <select value={filterTopic} onChange={(e) => setFilterTopic(e.target.value)} className="text-xs rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 text-[var(--fg)] focus:ring-2 focus:ring-[var(--primary)]/40 focus:outline-none" disabled={!filterChapter}>
+          <select aria-label="Filter by topic" value={filterTopic} onChange={(e) => setFilterTopic(e.target.value)} className="text-xs rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 text-[var(--fg)] focus:ring-2 focus:ring-[var(--primary)]/40 focus:outline-none" disabled={!filterChapter}>
             <option value="">All Topics</option>
             {topics.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
@@ -393,8 +393,9 @@ export default function QuestionManagementPage() {
         <div className="space-y-4 max-h-[70dvh] overflow-y-auto">
           <p className="text-xs font-semibold text-[var(--fg-muted)] uppercase tracking-wider">Question Details</p>
           <div>
-            <label className="block text-xs font-medium text-[var(--fg)] mb-1">Question Text</label>
+            <label htmlFor="q-text" className="block text-xs font-medium text-[var(--fg)] mb-1">Question Text</label>
             <textarea
+              id="q-text"
               value={form.question_text}
               onChange={(e) => setForm({ ...form, question_text: e.target.value })}
               rows={3}
@@ -404,8 +405,8 @@ export default function QuestionManagementPage() {
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-xs font-medium text-[var(--fg)] mb-1">Difficulty</label>
-              <select value={form.difficulty} onChange={(e) => setForm({ ...form, difficulty: e.target.value as Difficulty })} className="w-full text-xs rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 text-[var(--fg)] focus:ring-2 focus:ring-[var(--primary)]/40 focus:outline-none">
+              <label htmlFor="q-difficulty" className="block text-xs font-medium text-[var(--fg)] mb-1">Difficulty</label>
+              <select id="q-difficulty" value={form.difficulty} onChange={(e) => setForm({ ...form, difficulty: e.target.value as Difficulty })} className="w-full text-xs rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1.5 text-[var(--fg)] focus:ring-2 focus:ring-[var(--primary)]/40 focus:outline-none">
                 <option value="easy">Easy</option>
                 <option value="medium">Medium</option>
                 <option value="hard">Hard</option>
@@ -420,8 +421,9 @@ export default function QuestionManagementPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-[var(--fg)] mb-1">Explanation</label>
+            <label htmlFor="q-explanation" className="block text-xs font-medium text-[var(--fg)] mb-1">Explanation</label>
             <textarea
+              id="q-explanation"
               value={form.explanation}
               onChange={(e) => setForm({ ...form, explanation: e.target.value })}
               rows={2}
@@ -451,6 +453,7 @@ export default function QuestionManagementPage() {
                   </button>
                   <div className="flex-1 space-y-1">
                     <input
+                      aria-label={`Option ${String.fromCharCode(65 + i)}`}
                       value={opt.option_text}
                       onChange={(e) => {
                         const updated = [...optionForms];
@@ -461,6 +464,7 @@ export default function QuestionManagementPage() {
                       className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs text-[var(--fg)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40"
                     />
                     <input
+                      aria-label={`Explanation for option ${String.fromCharCode(65 + i)}`}
                       value={opt.explanation}
                       onChange={(e) => {
                         const updated = [...optionForms];
