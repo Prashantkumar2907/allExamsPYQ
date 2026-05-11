@@ -27,24 +27,35 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
+  const [userRank, setUserRank] = useState<number | null>(null);
 
   useEffect(() => {
     setPage('Leaderboard', 'See top performers');
-    loadLeaderboard();
-  }, []);
+    if (profile) void loadLeaderboard();
+  }, [profile]);
 
   async function loadLeaderboard() {
     if (!profile?.exam_id) { setLoading(false); return; }
     setLoading(true);
     setError('');
-    const { data, error: leaderboardError } = await supabase.rpc('get_leaderboard', {
-      p_exam_id: profile.exam_id,
-      p_limit: 50,
-    });
+    const [leaderboardRes, rankRes] = await Promise.all([
+      supabase.rpc('get_leaderboard', {
+        p_exam_id: profile.exam_id,
+        p_limit: 50,
+      }),
+      supabase.rpc('get_leaderboard_rank', {
+        p_exam_id: profile.exam_id,
+        p_user_id: profile.id,
+      }),
+    ]);
+    const { data, error: leaderboardError } = leaderboardRes;
     if (leaderboardError) {
       setError(getErrorMessage(leaderboardError, 'Unable to load leaderboard.'));
+    } else if (rankRes.error) {
+      setError(getErrorMessage(rankRes.error, 'Unable to load your rank.'));
     } else {
       setEntries((data || []) as LeaderboardEntry[]);
+      setUserRank((rankRes.data as number | null) ?? null);
     }
     setLoading(false);
   }
@@ -65,7 +76,8 @@ export default function LeaderboardPage() {
     return <EmptyState icon={Trophy} title="No rankings yet" description="Complete tests to appear on the leaderboard." />;
   }
 
-  const userRank = entries.findIndex((e) => e.user_id === profile?.id) + 1;
+  const visibleUserRank = entries.findIndex((e) => e.user_id === profile?.id) + 1;
+  const displayUserRank = userRank ?? (visibleUserRank > 0 ? visibleUserRank : null);
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -74,10 +86,10 @@ export default function LeaderboardPage() {
           <h1 className="text-xl font-bold text-[var(--fg)]">Leaderboard</h1>
           <p className="text-sm text-[var(--fg-muted)] mt-0.5">See how you rank against others</p>
         </div>
-        {userRank > 0 && (
+        {displayUserRank && (
           <div className="text-right">
             <p className="text-[11px] text-[var(--fg-muted)]">Your rank</p>
-            <p className="text-lg font-bold text-[var(--primary)]">#{userRank}</p>
+            <p className="text-lg font-bold text-[var(--primary)]">#{displayUserRank}</p>
           </div>
         )}
       </div>

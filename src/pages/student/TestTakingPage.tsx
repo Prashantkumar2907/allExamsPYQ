@@ -1,12 +1,12 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useBlocker } from 'react-router';
-import { useAuthStore } from '../../stores/authStore';
 import { usePageStore } from '../../stores/pageStore';
 import { supabase } from '../../lib/supabase';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { Sheet } from '../../components/ui/Sheet';
 import { LoadingSpinner } from '../../components/shared/LoadingSpinner';
 import { EmptyState } from '../../components/shared/EmptyState';
 import { ErrorState } from '../../components/shared/ErrorState';
@@ -18,14 +18,13 @@ import {
   ChevronLeft,
   ChevronRight,
   Flag,
-  CheckCircle,
+  ListChecks,
   Send,
 } from 'lucide-react';
-import type { Question, TestAttempt, Option } from '../../types/database';
+import type { Question, TestAttempt } from '../../types/database';
 
 export default function TestTakingPage() {
   const { attemptId } = useParams<{ attemptId: string }>();
-  const { profile } = useAuthStore();
   const setPage = usePageStore((s) => s.setPage);
   const navigate = useNavigate();
 
@@ -40,6 +39,7 @@ export default function TestTakingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitPromptOpen, setSubmitPromptOpen] = useState(false);
   const [leavePromptOpen, setLeavePromptOpen] = useState(false);
+  const [questionMapOpen, setQuestionMapOpen] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const attemptRef = useRef<TestAttempt | null>(null);
   const questionsRef = useRef<Question[]>([]);
@@ -89,11 +89,17 @@ export default function TestTakingPage() {
     setLoading(true);
     setError('');
 
+    if (!attemptId) {
+      setError('This test attempt could not be found.');
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data: att, error: attemptError } = await supabase
         .from('test_attempts')
         .select('*')
-        .eq('id', attemptId!)
+        .eq('id', attemptId)
         .single();
 
       if (attemptError) throw attemptError;
@@ -110,7 +116,7 @@ export default function TestTakingPage() {
       const { data: userAnswers, error: answersError } = await supabase
         .from('user_answers')
         .select('question_id, selected_option_id')
-        .eq('attempt_id', attemptId!);
+        .eq('attempt_id', attemptId);
 
       if (answersError) throw answersError;
 
@@ -129,7 +135,9 @@ export default function TestTakingPage() {
         if (questionsError) throw questionsError;
         if (qData) {
           const qMap = new Map(qData.map((q) => [q.id, q]));
-          const orderedQuestions = questionIds.map((id) => qMap.get(id)!).filter(Boolean);
+          const orderedQuestions = questionIds
+            .map((id) => qMap.get(id))
+            .filter((item): item is Question => Boolean(item));
           setQuestions(orderedQuestions);
           questionsRef.current = orderedQuestions;
         }
@@ -168,28 +176,25 @@ export default function TestTakingPage() {
   }
 
   const selectAnswer = useCallback(async (questionId: string, optionId: string) => {
-    if (submittingRef.current) return;
+    if (submittingRef.current || !attemptId) return;
     setAnswers((prev) => {
       const next = { ...prev, [questionId]: optionId };
       answersRef.current = next;
       return next;
     });
-    const question = questions.find((q) => q.id === questionId);
-    const option = question?.options?.find((o) => o.id === optionId);
     await trackAnswerSave(
       supabase
         .from('user_answers')
         .update({
           selected_option_id: optionId,
-          is_correct: option?.is_correct ?? null,
         })
-        .eq('attempt_id', attemptId!)
+        .eq('attempt_id', attemptId)
         .eq('question_id', questionId)
         .then(({ error: saveError }) => {
           if (saveError) toast.error(getErrorMessage(saveError, 'Could not save that answer.'));
         })
     );
-  }, [questions, attemptId]);
+  }, [attemptId]);
 
   function requestSubmit() {
     const unanswered = questionsRef.current.filter((q) => !answersRef.current[q.id]).length;
@@ -209,7 +214,10 @@ export default function TestTakingPage() {
     try {
       const latestQuestions = questionsRef.current;
       const latestAnswers = answersRef.current;
-      const latestAttempt = attemptRef.current;
+
+      if (!attemptId) {
+        throw new Error('This test attempt could not be found.');
+      }
 
       if (latestQuestions.length === 0) {
         throw new Error('This attempt has no questions to submit.');
@@ -219,88 +227,15 @@ export default function TestTakingPage() {
         await Promise.allSettled([...pendingAnswerSavesRef.current]);
       }
 
-      let correct = 0;
-      let wrong = 0;
-      let skipped = 0;
-      let score = 0;
-
-      latestQuestions.forEach((q) => {
-        const selectedId = latestAnswers[q.id];
-        if (!selectedId) {
-          skipped++;
-          return;
-        }
-        const option = q.options?.find((o) => o.id === selectedId);
-        if (option?.is_correct) {
-          correct++;
-          score += q.marks;
-        } else {
-          wrong++;
-          score -= q.negative_marks;
-        }
+      const { error: submitError } = await supabase.rpc('submit_attempt', {
+        p_attempt_id: attemptId,
+        p_answers: latestQuestions.map((q) => ({
+          question_id: q.id,
+          selected_option_id: latestAnswers[q.id] ?? null,
+        })),
       });
 
-      const finalScore = Math.max(0, score);
-      const startedAt = latestAttempt?.started_at ? new Date(latestAttempt.started_at).getTime() : Date.now();
-      const timeTaken = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
-      const answerSyncResults = await Promise.all(
-        latestQuestions.map((q) => {
-          const selectedId = latestAnswers[q.id] ?? null;
-          const option = selectedId ? q.options?.find((o) => o.id === selectedId) : null;
-          return supabase
-            .from('user_answers')
-            .update({
-              selected_option_id: selectedId,
-              is_correct: selectedId ? option?.is_correct ?? null : null,
-            })
-            .eq('attempt_id', attemptId!)
-            .eq('question_id', q.id);
-        })
-      );
-      const answerSyncError = answerSyncResults.find((result) => result.error)?.error;
-      if (answerSyncError) throw answerSyncError;
-
-      const { error: submitError } = await supabase
-        .from('test_attempts')
-        .update({
-          score: finalScore,
-          correct_answers: correct,
-          wrong_answers: wrong,
-          skipped,
-          time_taken_seconds: timeTaken,
-          status: 'completed' as const,
-          completed_at: new Date().toISOString(),
-        })
-        .eq('id', attemptId!);
-
       if (submitError) throw submitError;
-
-      if (latestAttempt?.source_type !== 'test' && profile?.id) {
-        const topicIds = [...new Set(latestQuestions.map((q) => q.topic_id).filter(Boolean))];
-        if (topicIds.length > 0) {
-          const { error: progressError } = await supabase.from('syllabus_progress').upsert(
-            topicIds.map((topicId) => ({
-              user_id: profile.id,
-              topic_id: topicId,
-              is_completed: true,
-              completed_at: new Date().toISOString(),
-            })),
-            { onConflict: 'user_id,topic_id' }
-          );
-          if (progressError) toast.warning(getErrorMessage(progressError, 'Progress could not be updated.'));
-        }
-      }
-
-      if (latestAttempt?.test_id && profile?.exam_id) {
-        const { error: leaderboardError } = await supabase.rpc('record_leaderboard_attempt', {
-          p_exam_id: profile.exam_id,
-          p_user_id: profile.id,
-          p_score: finalScore,
-          p_correct: correct,
-          p_questions: latestQuestions.length,
-        });
-        if (leaderboardError) toast.warning(getErrorMessage(leaderboardError, 'Leaderboard could not be updated.'));
-      }
 
       allowNavigationRef.current = true;
       navigate(`/result/${attemptId}`);
@@ -336,8 +271,8 @@ export default function TestTakingPage() {
   return (
     <div className="h-full flex flex-col overflow-hidden -m-3">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-surface)]">
-        <div className="text-sm font-semibold text-[var(--fg)] truncate max-w-[40%]">
+      <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-[var(--border)] bg-[var(--bg-surface)]">
+        <div className="text-sm font-semibold text-[var(--fg)] truncate min-w-0 max-w-[38%] sm:max-w-[45%]">
           {attempt?.source_name}
         </div>
         <div className={cn(
@@ -347,9 +282,21 @@ export default function TestTakingPage() {
           <Clock className="h-4 w-4" />
           {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
         </div>
-        <Button size="sm" onClick={requestSubmit} loading={submitting}>
-          <Send className="h-3.5 w-3.5" /> Submit
-        </Button>
+        <div className="flex items-center gap-1.5">
+          <Button
+            variant="secondary"
+            size="sm"
+            className="md:hidden px-2"
+            onClick={() => setQuestionMapOpen(true)}
+            aria-label="Open question map"
+          >
+            <ListChecks className="h-3.5 w-3.5" />
+            <span className="sr-only">Questions</span>
+          </Button>
+          <Button size="sm" onClick={requestSubmit} loading={submitting}>
+            <Send className="h-3.5 w-3.5" /> Submit
+          </Button>
+        </div>
       </div>
 
       <div className="flex-1 flex overflow-hidden">
@@ -392,8 +339,8 @@ export default function TestTakingPage() {
               </Card>
 
               <div className="space-y-2">
-                {question.options
-                  ?.sort((a, b) => a.sort_order - b.sort_order)
+                {[...(question.options ?? [])]
+                  .sort((a, b) => a.sort_order - b.sort_order)
                   .map((opt, oi) => (
                     <button
                       key={opt.id}
@@ -485,6 +432,43 @@ export default function TestTakingPage() {
           </div>
         </div>
       </div>
+      <Sheet
+        open={questionMapOpen}
+        onOpenChange={setQuestionMapOpen}
+        title="Question map"
+        description={`${answeredCount} of ${questions.length} answered`}
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-6 gap-2">
+            {questions.map((q, i) => (
+              <button
+                key={q.id}
+                onClick={() => {
+                  setCurrentIdx(i);
+                  setQuestionMapOpen(false);
+                }}
+                className={cn(
+                  'h-10 rounded-full text-xs font-semibold transition duration-100 cursor-pointer flex items-center justify-center focus-ring',
+                  i === currentIdx && 'ring-2 ring-[var(--primary)] ring-offset-1 ring-offset-[var(--bg-surface)]',
+                  answers[q.id]
+                    ? 'bg-[var(--primary)] text-[var(--primary-fg)]'
+                    : flagged.has(q.id)
+                    ? 'bg-amber-500/20 text-amber-500 border border-amber-500/30'
+                    : 'bg-[var(--bg-surface-hover)] text-[var(--fg-muted)] hover:bg-[var(--bg-body)]'
+                )}
+                aria-label={`Go to question ${i + 1}`}
+              >
+                {i + 1}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-3 gap-2 border-t border-[var(--border)] pt-3 text-[11px] text-[var(--fg-muted)]">
+            <span className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-[var(--primary)]" />Answered</span>
+            <span className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-amber-500/20 border border-amber-500/30" />Flagged</span>
+            <span className="flex items-center gap-2"><span className="h-3 w-3 rounded-full bg-[var(--bg-surface-hover)]" />Open</span>
+          </div>
+        </div>
+      </Sheet>
       <ConfirmDialog
         open={submitPromptOpen}
         onOpenChange={setSubmitPromptOpen}

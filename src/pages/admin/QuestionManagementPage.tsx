@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { usePageStore } from '../../stores/pageStore';
 import { Card, CardHeader, CardTitle } from '../../components/ui/Card';
@@ -30,6 +31,7 @@ interface OptionForm {
 
 export default function QuestionManagementPage() {
   const setPage = usePageStore((s) => s.setPage);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -66,6 +68,10 @@ export default function QuestionManagementPage() {
   ]);
 
   useEffect(() => { setPage('Questions', 'Create and manage questions'); loadExams(); }, []);
+  useEffect(() => {
+    const reportedQuestionId = searchParams.get('question');
+    if (reportedQuestionId) void openQuestionFromReport(reportedQuestionId);
+  }, [searchParams]);
   useEffect(() => { if (filterExam) loadSubjects(); else { setSubjects([]); setFilterSubject(''); } }, [filterExam]);
   useEffect(() => { if (filterSubject) loadChapters(); else { setChapters([]); setFilterChapter(''); } }, [filterSubject]);
   useEffect(() => { if (filterChapter) loadTopics(); else { setTopics([]); setFilterTopic(''); } }, [filterChapter]);
@@ -154,7 +160,7 @@ export default function QuestionManagementPage() {
       explanation: q.explanation || '',
       year: q.year != null ? String(q.year) : '',
     });
-    const opts = q.options.sort((a, b) => a.sort_order - b.sort_order).map((o) => ({
+    const opts = [...q.options].sort((a, b) => a.sort_order - b.sort_order).map((o) => ({
       option_text: o.option_text,
       is_correct: o.is_correct,
       explanation: o.explanation || '',
@@ -162,6 +168,21 @@ export default function QuestionManagementPage() {
     while (opts.length < 4) opts.push({ option_text: '', is_correct: false, explanation: '' });
     setOptionForms(opts);
     setDialogOpen(true);
+  }
+
+  async function openQuestionFromReport(questionId: string) {
+    const { data, error: questionError } = await supabase
+      .from('questions')
+      .select('*, options(*)')
+      .eq('id', questionId)
+      .single();
+    if (questionError) {
+      toast.error(getErrorMessage(questionError, 'Unable to open the reported question.'));
+      setSearchParams({}, { replace: true });
+      return;
+    }
+    if (data) openEdit(data as QuestionWithOptions);
+    setSearchParams({}, { replace: true });
   }
 
   function validateQuestionForm(topicId: string | undefined) {
@@ -205,9 +226,6 @@ export default function QuestionManagementPage() {
         const { error: updateError } = await supabase.from('questions').update(questionPayload).eq('id', editQ.id);
         if (updateError) throw updateError;
 
-        const { error: deleteOptionsError } = await supabase.from('options').delete().eq('question_id', editQ.id);
-        if (deleteOptionsError) throw deleteOptionsError;
-
         const opts = optionForms.filter((o) => o.option_text.trim()).map((o, i) => ({
           question_id: editQ.id,
           option_text: normalizeText(o.option_text),
@@ -215,9 +233,14 @@ export default function QuestionManagementPage() {
           explanation: o.explanation || null,
           sort_order: i,
         }));
+        const existingOptionIds = editQ.options.map((option) => option.id);
         if (opts.length) {
-          const { error: optionsError } = await supabase.from('options').insert(opts);
+          const { error: optionsError } = await supabase.from('options').insert(opts).select('id');
           if (optionsError) throw optionsError;
+        }
+        if (existingOptionIds.length > 0) {
+          const { error: deleteOptionsError } = await supabase.from('options').delete().in('id', existingOptionIds);
+          if (deleteOptionsError) throw deleteOptionsError;
         }
       } else {
         const { data: newQ, error: createError } = await supabase.from('questions').insert(questionPayload).select().single();

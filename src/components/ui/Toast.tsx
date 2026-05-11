@@ -23,9 +23,6 @@ export const useToastStore = create<ToastState>((set) => ({
   show: (type, message, duration = 4000) => {
     const id = crypto.randomUUID();
     set((s) => ({ toasts: [...s.toasts, { id, type, message, duration }] }));
-    if (duration > 0) {
-      setTimeout(() => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })), duration);
-    }
   },
   dismiss: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 }));
@@ -47,6 +44,12 @@ const colors: Record<ToastType, string> = {
 function ToastItem({ toast }: { toast: Toast }) {
   const { dismiss } = useToastStore();
   const Icon = icons[toast.type];
+
+  useEffect(() => {
+    if (!toast.duration || toast.duration <= 0) return;
+    const timeoutId = window.setTimeout(() => dismiss(toast.id), toast.duration);
+    return () => window.clearTimeout(timeoutId);
+  }, [dismiss, toast.duration, toast.id]);
 
   return (
     <div

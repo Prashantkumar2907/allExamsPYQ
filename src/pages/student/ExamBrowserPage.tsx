@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { usePageStore } from '../../stores/pageStore';
@@ -15,6 +15,23 @@ import { cn } from '../../lib/utils';
 import type { Subject, Chapter, Topic } from '../../types/database';
 
 type Level = 'subjects' | 'chapters' | 'topics';
+type MaybeRelation<T> = T | T[] | null | undefined;
+type QuestionCountRow = {
+  id: string;
+  topic_id: string;
+  topic?: MaybeRelation<{
+    id: string;
+    chapter_id: string;
+    chapter?: MaybeRelation<{
+      id: string;
+      subject_id: string;
+      subject?: MaybeRelation<{
+        id: string;
+        exam_id: string;
+      }>;
+    }>;
+  }>;
+};
 
 export default function ExamBrowserPage() {
   const { profile } = useAuthStore();
@@ -43,14 +60,27 @@ export default function ExamBrowserPage() {
   async function loadSubjects() {
     setLoading(true);
     setError('');
+    if (!profile?.exam_id) {
+      setLoading(false);
+      return;
+    }
     try {
-      const { data, error: subjectsError } = await supabase
-        .from('subjects')
-        .select('*')
-        .eq('exam_id', profile!.exam_id!)
-        .order('sort_order');
+      const [subjectsRes, countsRes] = await Promise.all([
+        supabase
+          .from('subjects')
+          .select('*')
+          .eq('exam_id', profile.exam_id)
+          .order('sort_order'),
+        supabase
+          .from('questions')
+          .select('id, topic_id, topic:topics(id, chapter_id, chapter:chapters(id, subject_id, subject:subjects(id, exam_id)))')
+          .eq('is_active', true),
+      ]);
+      const { data, error: subjectsError } = subjectsRes;
       if (subjectsError) throw subjectsError;
+      if (countsRes.error) throw countsRes.error;
       setSubjects(data || []);
+      setQuestionCounts(buildQuestionCounts((countsRes.data || []) as unknown as QuestionCountRow[], profile.exam_id));
     } catch (err) {
       setError(getErrorMessage(err, 'Unable to load subjects.'));
     } finally {
@@ -129,6 +159,29 @@ export default function ExamBrowserPage() {
     }
   }
 
+  function buildQuestionCounts(rows: QuestionCountRow[], examId: string) {
+    return rows.reduce<Record<string, number>>((acc, row) => {
+      const topic = firstRelation(row.topic);
+      const chapter = firstRelation(topic?.chapter);
+      const subject = firstRelation(chapter?.subject);
+      if (!topic || !chapter || subject?.exam_id !== examId) return acc;
+      acc[subject.id] = (acc[subject.id] ?? 0) + 1;
+      acc[chapter.id] = (acc[chapter.id] ?? 0) + 1;
+      acc[topic.id] = (acc[topic.id] ?? 0) + 1;
+      return acc;
+    }, {});
+  }
+
+  function firstRelation<T>(value: MaybeRelation<T>): T | null {
+    return Array.isArray(value) ? value[0] ?? null : value ?? null;
+  }
+
+  function handleActionKey(event: KeyboardEvent<HTMLElement>, action: () => void) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    action();
+  }
+
   if (!profile?.exam_id) {
     return (
       <EmptyState
@@ -188,7 +241,12 @@ export default function ExamBrowserPage() {
           subjects.map((s) => (
             <Card
               key={s.id}
-              className="hover:translate-y-[-2px] hover:shadow-lg transition duration-200 group"
+              role="button"
+              tabIndex={0}
+              aria-label={`Open ${s.name}`}
+              onClick={() => void selectSubject(s)}
+              onKeyDown={(event) => handleActionKey(event, () => void selectSubject(s))}
+              className="hover:translate-y-[-2px] hover:shadow-lg transition duration-200 group cursor-pointer focus-ring"
             >
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-xl bg-[var(--primary)]/10 flex items-center justify-center flex-shrink-0 group-hover:bg-[var(--primary)]/15 transition-colors">
@@ -199,21 +257,17 @@ export default function ExamBrowserPage() {
                   {s.description && (
                     <p className="text-[11px] text-[var(--fg-muted)] truncate mt-0.5">{s.description}</p>
                   )}
+                  <Badge variant="default" className="mt-1">{questionCounts[s.id] ?? 0} questions</Badge>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => selectSubject(s)}
-                    aria-label={`Open ${s.name}`}
-                    title={`Open ${s.name}`}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
+                  <ChevronRight className="h-4 w-4 text-[var(--fg-muted)]" />
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => startPractice('subject', s.id)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void startPractice('subject', s.id);
+                    }}
                     loading={startingKey === `subject:${s.id}`}
                   >
                     <Play className="h-3 w-3" /> Practice
@@ -227,7 +281,12 @@ export default function ExamBrowserPage() {
           chapters.map((c) => (
             <Card
               key={c.id}
-              className="hover:translate-y-[-2px] hover:shadow-lg transition duration-200 group"
+              role="button"
+              tabIndex={0}
+              aria-label={`Open ${c.name}`}
+              onClick={() => void selectChapter(c)}
+              onKeyDown={(event) => handleActionKey(event, () => void selectChapter(c))}
+              className="hover:translate-y-[-2px] hover:shadow-lg transition duration-200 group cursor-pointer focus-ring"
             >
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center flex-shrink-0 group-hover:bg-amber-500/15 transition-colors">
@@ -235,21 +294,17 @@ export default function ExamBrowserPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-[var(--fg)] truncate">{c.name}</p>
+                  <Badge variant="default" className="mt-1">{questionCounts[c.id] ?? 0} questions</Badge>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => selectChapter(c)}
-                    aria-label={`Open ${c.name}`}
-                    title={`Open ${c.name}`}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
+                  <ChevronRight className="h-4 w-4 text-[var(--fg-muted)]" />
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => startPractice('chapter', c.id)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      void startPractice('chapter', c.id);
+                    }}
                     loading={startingKey === `chapter:${c.id}`}
                   >
                     <Play className="h-3 w-3" /> Practice
@@ -263,17 +318,28 @@ export default function ExamBrowserPage() {
           topics.map((t) => (
             <Card
               key={t.id}
-              className="hover:translate-y-[-2px] hover:shadow-lg transition duration-200 group"
+              role="button"
+              tabIndex={0}
+              aria-label={`Start practice for ${t.name}`}
+              onClick={() => void startPractice('topic', t.id)}
+              onKeyDown={(event) => handleActionKey(event, () => void startPractice('topic', t.id))}
+              className="hover:translate-y-[-2px] hover:shadow-lg transition duration-200 group cursor-pointer focus-ring"
             >
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-xl bg-green-500/10 flex items-center justify-center flex-shrink-0 group-hover:bg-green-500/15 transition-colors">
                   <Hash className="h-5 w-5 text-green-500" />
                 </div>
-                <p className="text-sm font-semibold text-[var(--fg)] truncate flex-1">{t.name}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-[var(--fg)] truncate">{t.name}</p>
+                  <Badge variant="default" className="mt-1">{questionCounts[t.id] ?? 0} questions</Badge>
+                </div>
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => startPractice('topic', t.id)}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void startPractice('topic', t.id);
+                  }}
                   className="flex-shrink-0"
                   loading={startingKey === `topic:${t.id}`}
                 >

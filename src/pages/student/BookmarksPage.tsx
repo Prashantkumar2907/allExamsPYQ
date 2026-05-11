@@ -40,16 +40,17 @@ export default function BookmarksPage() {
 
   useEffect(() => {
     setPage('Bookmarks', 'Review your saved questions');
-    loadBookmarks();
-  }, []);
+    if (profile) void loadBookmarks();
+  }, [profile]);
 
   async function loadBookmarks(append = false) {
+    if (!profile) return;
     const from = append ? bookmarks.length : 0;
     if (!append) setError('');
     const { data, error: bookmarksError } = await supabase
       .from('bookmarks')
       .select('*, question:questions(*, options(*), topic:topics(id, name, chapter:chapters(id, name, subject:subjects(id, name))))')
-      .eq('user_id', profile!.id)
+      .eq('user_id', profile.id)
       .order('created_at', { ascending: false })
       .range(from, from + PAGE_SIZE - 1);
     if (bookmarksError) {
@@ -273,8 +274,8 @@ export default function BookmarksPage() {
 
               {/* Options with explanations */}
               <div className="space-y-2">
-                {q.options
-                  ?.sort((a, b) => a.sort_order - b.sort_order)
+                {[...(q.options ?? [])]
+                  .sort((a, b) => a.sort_order - b.sort_order)
                   .map((opt, i) => {
                     const optLetter = String.fromCharCode(65 + i);
                     return (

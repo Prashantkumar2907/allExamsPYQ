@@ -9,6 +9,22 @@ interface BeforeInstallPromptEvent extends Event {
 
 const dismissKey = 'allexamspyq-install-dismissed-v1';
 
+function readDismissed() {
+  try {
+    return localStorage.getItem(dismissKey) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function writeDismissed() {
+  try {
+    localStorage.setItem(dismissKey, 'true');
+  } catch {
+    // The prompt can still be dismissed for this React session.
+  }
+}
+
 function isIOSDevice() {
   const platform = navigator.platform || '';
   const agent = navigator.userAgent || '';
@@ -24,7 +40,7 @@ function isStandaloneDisplay() {
 
 export function PWAInstallPrompt() {
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
-  const [dismissed, setDismissed] = useState(() => localStorage.getItem(dismissKey) === 'true');
+  const [dismissed, setDismissed] = useState(readDismissed);
   const [standalone, setStandalone] = useState(false);
   const isiOS = useMemo(isIOSDevice, []);
 
@@ -37,7 +53,7 @@ export function PWAInstallPrompt() {
     }
 
     function handleInstalled() {
-      localStorage.setItem(dismissKey, 'true');
+      writeDismissed();
       setDismissed(true);
       setInstallEvent(null);
       setStandalone(true);
@@ -55,17 +71,20 @@ export function PWAInstallPrompt() {
 
   async function installApp() {
     if (!installEvent) return;
-    await installEvent.prompt();
-    const choice = await installEvent.userChoice;
-    if (choice.outcome === 'accepted') {
-      localStorage.setItem(dismissKey, 'true');
-      setDismissed(true);
+    try {
+      await installEvent.prompt();
+      const choice = await installEvent.userChoice;
+      if (choice.outcome === 'accepted') {
+        writeDismissed();
+        setDismissed(true);
+      }
+    } finally {
+      setInstallEvent(null);
     }
-    setInstallEvent(null);
   }
 
   function dismiss() {
-    localStorage.setItem(dismissKey, 'true');
+    writeDismissed();
     setDismissed(true);
   }
 

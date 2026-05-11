@@ -55,16 +55,26 @@ export default function TestResultPage() {
   useEffect(() => {
     setPage('Test Result', '');
     loadResult();
-  }, [attemptId]);
+  }, [attemptId, profile]);
 
   async function loadResult() {
     setLoading(true);
     setError('');
+    if (!attemptId) {
+      setError('This result could not be found.');
+      setLoading(false);
+      return;
+    }
+    if (!profile) {
+      setError('Your profile is still loading. Please try again.');
+      setLoading(false);
+      return;
+    }
     try {
       const [attRes, ansRes, bmRes] = await Promise.all([
-        supabase.from('test_attempts').select('*').eq('id', attemptId!).single(),
-        supabase.from('user_answers').select('*, question:questions(*, options(*))').eq('attempt_id', attemptId!),
-        supabase.from('bookmarks').select('question_id').eq('user_id', profile!.id),
+        supabase.from('test_attempts').select('*').eq('id', attemptId).single(),
+        supabase.from('user_answers').select('*, question:questions(*, options(*))').eq('attempt_id', attemptId),
+        supabase.from('bookmarks').select('question_id').eq('user_id', profile.id),
       ]);
 
       if (attRes.error) throw attRes.error;
@@ -84,8 +94,12 @@ export default function TestResultPage() {
   }
 
   async function toggleBookmark(questionId: string) {
+    if (!profile) {
+      toast.error('Your profile is still loading. Please try again.');
+      return;
+    }
     if (bookmarkedIds.has(questionId)) {
-      const { error: deleteError } = await supabase.from('bookmarks').delete().eq('user_id', profile!.id).eq('question_id', questionId);
+      const { error: deleteError } = await supabase.from('bookmarks').delete().eq('user_id', profile.id).eq('question_id', questionId);
       if (deleteError) {
         toast.error(getErrorMessage(deleteError, 'Could not remove bookmark.'));
         return;
@@ -101,9 +115,13 @@ export default function TestResultPage() {
 
   async function saveBookmark() {
     if (!bookmarkQuestionId) return;
+    if (!profile) {
+      toast.error('Your profile is still loading. Please try again.');
+      return;
+    }
     setSavingBookmark(true);
     const { error: bookmarkError } = await supabase.from('bookmarks').upsert(
-      { user_id: profile!.id, question_id: bookmarkQuestionId, notes: bookmarkNote || null },
+      { user_id: profile.id, question_id: bookmarkQuestionId, notes: bookmarkNote || null },
       { onConflict: 'user_id,question_id' }
     );
     if (bookmarkError) {
@@ -119,9 +137,13 @@ export default function TestResultPage() {
 
   async function submitReport() {
     if (!reportReason.trim()) return;
+    if (!profile) {
+      toast.error('Your profile is still loading. Please try again.');
+      return;
+    }
     setSavingReport(true);
     const { error: reportError } = await supabase.from('reported_questions').insert({
-      user_id: profile!.id,
+      user_id: profile.id,
       question_id: reportQuestionId,
       reason: reportReason,
       description: reportDescription.trim() || null,
@@ -235,8 +257,8 @@ export default function TestResultPage() {
 
               {/* Options */}
               <div className="px-3.5 pb-2 space-y-1.5">
-                {q.options
-                  ?.sort((a, b) => a.sort_order - b.sort_order)
+                {[...(q.options ?? [])]
+                  .sort((a, b) => a.sort_order - b.sort_order)
                   .map((opt, optIdx) => {
                     const isSelected = ans.selected_option_id === opt.id;
                     const isRight = opt.is_correct;

@@ -35,7 +35,8 @@ export default function LoginPage() {
     if (error) {
       setError(error);
     } else {
-      navigate('/dashboard');
+      const signedInProfile = useAuthStore.getState().profile;
+      navigate(signedInProfile?.role === 'admin' ? '/admin' : '/dashboard');
     }
   };
 

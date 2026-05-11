@@ -63,20 +63,21 @@ export default function ProfilePage() {
   }, [profile]);
 
   async function loadData() {
+    if (!profile) return;
     setLoading(true);
     try {
       const [examsRes, bmRes, attemptsRes, lbRes] = await Promise.all([
         supabase.from('exams').select('*').eq('is_active', true).order('name'),
         supabase.from('bookmarks').select('*, question:questions(*, options(*))', { count: 'exact' })
-          .eq('user_id', profile!.id).order('created_at', { ascending: false }).limit(4),
+          .eq('user_id', profile.id).order('created_at', { ascending: false }).limit(4),
         supabase.from('test_attempts')
           .select('score, correct_answers, total_questions, completed_at, started_at', { count: 'exact' })
-          .eq('user_id', profile!.id)
+          .eq('user_id', profile.id)
           .eq('status', 'completed')
           .order('completed_at', { ascending: false })
           .limit(PROFILE_ATTEMPT_LIMIT),
         profile?.exam_id
-          ? supabase.from('leaderboard_scores').select('total_score').eq('user_id', profile!.id).eq('exam_id', profile!.exam_id).single()
+          ? supabase.from('leaderboard_scores').select('total_score').eq('user_id', profile.id).eq('exam_id', profile.exam_id).single()
           : Promise.resolve({ data: null }),
       ]);
       if (examsRes.data) setExams(examsRes.data);
@@ -140,7 +141,20 @@ export default function ProfilePage() {
     } finally { setSaving(false); }
   }
 
-  function handleSaveAvatar() { setAvatarStyle(tempAvatarStyle); setAvatarDialogOpen(false); }
+  async function handleSaveAvatar() {
+    if (!profile) return;
+    setSaving(true);
+    const avatarUrl = getAvatarUrl(tempAvatarStyle, profile.full_name);
+    const { error } = await updateProfile({ avatar_url: avatarUrl });
+    setSaving(false);
+    if (error) {
+      toast.error(error);
+      return;
+    }
+    setAvatarStyle(tempAvatarStyle);
+    setAvatarDialogOpen(false);
+    toast.success('Avatar updated.');
+  }
 
   if (!profile || loading) {
     return (
@@ -308,7 +322,7 @@ export default function ProfilePage() {
           </div>
           <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
             <Button variant="secondary" size="sm" onClick={() => setAvatarDialogOpen(false)}>Cancel</Button>
-            <Button size="sm" onClick={handleSaveAvatar}><CheckCircle className="h-3.5 w-3.5" /> Select Avatar</Button>
+            <Button size="sm" onClick={() => void handleSaveAvatar()} loading={saving}><CheckCircle className="h-3.5 w-3.5" /> Save Avatar</Button>
           </div>
         </div>
       </Dialog>
@@ -326,7 +340,7 @@ export default function ProfilePage() {
               </div>
               <p className="text-sm text-[var(--fg)] leading-relaxed font-medium">{q.question_text}</p>
               <div className="space-y-2">
-                {q.options?.sort((a, b) => a.sort_order - b.sort_order).map((opt, i) => {
+                {[...(q.options ?? [])].sort((a, b) => a.sort_order - b.sort_order).map((opt, i) => {
                   const optLetter = String.fromCharCode(65 + i);
                   return (
                     <div key={opt.id} className={cn('rounded-lg px-3 py-2.5 border transition-colors', opt.is_correct ? 'bg-green-500/8 border-green-500/25' : 'bg-[var(--bg-body)] border-transparent')}>

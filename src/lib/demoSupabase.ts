@@ -486,8 +486,12 @@ function readSession() {
 }
 
 function writeSession(session: ReturnType<typeof createSession> | null) {
-  if (session) localStorage.setItem(sessionKey, JSON.stringify(session));
-  else localStorage.removeItem(sessionKey);
+  try {
+    if (session) localStorage.setItem(sessionKey, JSON.stringify(session));
+    else localStorage.removeItem(sessionKey);
+  } catch {
+    // Demo auth still works in memory for the current call path if storage is unavailable.
+  }
 }
 
 function emitAuth(event: string, session: ReturnType<typeof createSession> | null) {
@@ -721,6 +725,168 @@ function startDemoPracticeAttempt(params: Record<string, unknown>): QueryResult<
   return { data: attemptId, error: null };
 }
 
+function submitDemoAttempt(params: Record<string, unknown>): QueryResult<Array<Record<string, number>>> {
+  const state = loadState();
+  const profile = getCurrentProfile(state);
+  if (!profile) return { data: null, error: { message: 'Authentication required' } };
+
+  const attemptId = String(params.p_attempt_id ?? '');
+  const attempt = state.test_attempts.find((item) => item.id === attemptId);
+  if (!attempt) return { data: null, error: { message: 'This test attempt could not be found.' } };
+  if (attempt.user_id !== profile.id && profile.role !== 'admin') {
+    return { data: null, error: { message: 'You cannot submit this attempt.' } };
+  }
+
+  const existingSummary = {
+    score: attempt.score,
+    correct_answers: attempt.correct_answers,
+    wrong_answers: attempt.wrong_answers,
+    skipped: attempt.skipped,
+    total_questions: attempt.total_questions,
+    total_marks: attempt.total_marks,
+    time_taken_seconds: attempt.time_taken_seconds ?? 0,
+  };
+
+  if (attempt.status === 'completed') return { data: [existingSummary], error: null };
+  if (attempt.status !== 'in_progress') {
+    return { data: null, error: { message: 'Only in-progress attempts can be submitted.' } };
+  }
+
+  const payload = params.p_answers;
+  const answers = Array.isArray(payload) ? payload : [];
+
+  for (const answer of answers) {
+    const row = answer as { question_id?: unknown; selected_option_id?: unknown };
+    const questionId = String(row.question_id ?? '');
+    const selectedOptionId = row.selected_option_id == null ? null : String(row.selected_option_id);
+    const userAnswer = state.user_answers.find(
+      (item) => item.attempt_id === attempt.id && item.question_id === questionId
+    );
+    if (!userAnswer) {
+      return { data: null, error: { message: 'Question is not part of this attempt.' } };
+    }
+    if (
+      selectedOptionId &&
+      !state.options.some((option) => option.id === selectedOptionId && option.question_id === questionId)
+    ) {
+      return { data: null, error: { message: 'Selected option does not belong to its question.' } };
+    }
+    userAnswer.selected_option_id = selectedOptionId;
+  }
+
+  const attemptAnswers = state.user_answers.filter((item) => item.attempt_id === attempt.id);
+  let score = 0;
+  let correct = 0;
+  let wrong = 0;
+  let skipped = 0;
+  let totalMarks = 0;
+
+  attemptAnswers.forEach((answer) => {
+    const question = state.questions.find((item) => item.id === answer.question_id);
+    if (!question) return;
+    totalMarks += question.marks;
+    if (!answer.selected_option_id) {
+      answer.is_correct = null;
+      skipped += 1;
+      return;
+    }
+    const option = state.options.find(
+      (item) => item.id === answer.selected_option_id && item.question_id === answer.question_id
+    );
+    const isCorrect = option?.is_correct === true;
+    answer.is_correct = isCorrect;
+    if (isCorrect) {
+      correct += 1;
+      score += question.marks;
+    } else {
+      wrong += 1;
+      score -= question.negative_marks;
+    }
+  });
+
+  const elapsedSeconds = Math.max(0, Math.floor((Date.now() - new Date(attempt.started_at).getTime()) / 1000));
+  const timeTaken = attempt.duration_minutes
+    ? Math.min(elapsedSeconds, attempt.duration_minutes * 60)
+    : elapsedSeconds;
+
+  attempt.score = Math.max(0, score);
+  attempt.correct_answers = correct;
+  attempt.wrong_answers = wrong;
+  attempt.skipped = skipped;
+  attempt.total_questions = attemptAnswers.length;
+  attempt.total_marks = totalMarks;
+  attempt.time_taken_seconds = timeTaken;
+  attempt.status = 'completed';
+  attempt.completed_at = new Date().toISOString();
+
+  if (attempt.source_type !== 'test') {
+    const topicIds = new Set(
+      attemptAnswers
+        .map((answer) => state.questions.find((question) => question.id === answer.question_id)?.topic_id)
+        .filter((topicId): topicId is string => Boolean(topicId))
+    );
+    topicIds.forEach((topicId) => {
+      const existing = state.syllabus_progress.find(
+        (item) => item.user_id === attempt.user_id && item.topic_id === topicId
+      );
+      if (existing) {
+        existing.is_completed = true;
+        existing.completed_at = new Date().toISOString();
+      } else {
+        state.syllabus_progress.push({
+          id: createId('progress'),
+          user_id: attempt.user_id,
+          topic_id: topicId,
+          is_completed: true,
+          completed_at: new Date().toISOString(),
+        });
+      }
+    });
+  }
+
+  if (attempt.test_id) {
+    const test = state.tests.find((item) => item.id === attempt.test_id);
+    const leaderboardExamId = test?.exam_id ?? profile.exam_id;
+    if (leaderboardExamId) {
+      const existing = state.leaderboard_scores.find(
+        (row) => row.exam_id === leaderboardExamId && row.user_id === attempt.user_id
+      );
+      if (existing) {
+        existing.total_score += attempt.score;
+        existing.tests_taken += 1;
+        existing.total_correct += correct;
+        existing.total_questions += attemptAnswers.length;
+        existing.updated_at = new Date().toISOString();
+      } else {
+        state.leaderboard_scores.push({
+          id: createId('leaderboard'),
+          exam_id: leaderboardExamId,
+          user_id: attempt.user_id,
+          total_score: attempt.score,
+          tests_taken: 1,
+          total_correct: correct,
+          total_questions: attemptAnswers.length,
+          updated_at: new Date().toISOString(),
+        });
+      }
+    }
+  }
+
+  saveState(state);
+  return {
+    data: [{
+      score: attempt.score,
+      correct_answers: correct,
+      wrong_answers: wrong,
+      skipped,
+      total_questions: attemptAnswers.length,
+      total_marks: totalMarks,
+      time_taken_seconds: timeTaken,
+    }],
+    error: null,
+  };
+}
+
 export const demoSupabase = {
   from(table: DemoTableName) {
     return new DemoQuery(table);
@@ -762,12 +928,32 @@ export const demoSupabase = {
       return { data, error: null };
     }
 
+    if (functionName === 'get_leaderboard_rank') {
+      const state = loadState();
+      const profile = getCurrentProfile(state);
+      const examId = String(params.p_exam_id ?? '');
+      const userId = String(params.p_user_id ?? profile?.id ?? '');
+      if (!profile) return { data: null, error: { message: 'Authentication required' } };
+      if (userId !== profile.id && profile.role !== 'admin') {
+        return { data: null, error: { message: 'You cannot read this leaderboard rank.' } };
+      }
+      const sorted = state.leaderboard_scores
+        .filter((row) => row.exam_id === examId)
+        .sort((a, b) => b.total_score - a.total_score || a.updated_at.localeCompare(b.updated_at));
+      const rank = sorted.findIndex((row) => row.user_id === userId);
+      return { data: rank >= 0 ? rank + 1 : null, error: null };
+    }
+
     if (functionName === 'start_test_attempt') {
       return startDemoTestAttempt(params);
     }
 
     if (functionName === 'start_practice_attempt') {
       return startDemoPracticeAttempt(params);
+    }
+
+    if (functionName === 'submit_attempt') {
+      return submitDemoAttempt(params);
     }
 
     if (functionName !== 'record_leaderboard_attempt') {

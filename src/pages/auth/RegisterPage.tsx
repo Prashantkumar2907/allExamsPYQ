@@ -9,6 +9,7 @@ import { Select } from '../../components/ui/Select';
 import { GraduationCap, User, Mail, Lock, Eye, EyeOff, BookOpen, Sun, Moon, ArrowLeft } from 'lucide-react';
 import { APP_NAME } from '../../lib/constants';
 import { isSupabaseConfigured } from '../../lib/env';
+import { getErrorMessage } from '../../lib/api';
 import type { Exam } from '../../types/database';
 
 export default function RegisterPage() {
@@ -18,6 +19,8 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [examId, setExamId] = useState('');
   const [exams, setExams] = useState<Exam[]>([]);
+  const [examLoading, setExamLoading] = useState(isSupabaseConfigured);
+  const [examLoadError, setExamLoadError] = useState('');
   const [error, setError] = useState('');
   const { signUp, submitting } = useAuthStore();
   const { toggleTheme, resolvedTheme } = useThemeStore();
@@ -25,16 +28,29 @@ export default function RegisterPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
-    supabase
+    void loadExams();
+  }, []);
+
+  async function loadExams() {
+    if (!isSupabaseConfigured) {
+      setExamLoading(false);
+      return;
+    }
+    setExamLoading(true);
+    setExamLoadError('');
+    const { data, error: examsError } = await supabase
       .from('exams')
       .select('*')
       .eq('is_active', true)
-      .order('name')
-      .then(({ data }) => {
-        if (data) setExams(data);
-      });
-  }, []);
+      .order('name');
+    if (examsError) {
+      setExamLoadError(getErrorMessage(examsError, 'Unable to load exams right now.'));
+      setExams([]);
+    } else {
+      setExams(data || []);
+    }
+    setExamLoading(false);
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -164,8 +180,16 @@ export default function RegisterPage() {
                   value={examId}
                   onValueChange={setExamId}
                   options={exams.map((e) => ({ value: e.id, label: e.name }))}
-                  placeholder="Choose your exam"
+                  placeholder={examLoading ? 'Loading exams...' : 'Choose your exam'}
                 />
+                {examLoadError && (
+                  <div className="mt-2 rounded-lg border border-[var(--danger)]/20 bg-[var(--danger)]/10 px-3 py-2">
+                    <p className="text-[11px] text-[var(--danger)]">{examLoadError}</p>
+                    <Button type="button" variant="link" size="sm" className="mt-1 h-auto p-0" onClick={() => void loadExams()}>
+                      Retry loading exams
+                    </Button>
+                  </div>
+                )}
                 {!examId && (
                   <p className="text-[11px] text-[var(--fg-subtle)] mt-1.5 flex items-center gap-1">
                     <BookOpen className="h-3 w-3" />

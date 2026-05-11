@@ -42,6 +42,7 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [attempts, setAttempts] = useState<AnalyticsAttempt[]>([]);
+  const [attemptTotal, setAttemptTotal] = useState(0);
 
   useEffect(() => {
     setPage('Analytics', 'Track your performance');
@@ -57,15 +58,16 @@ export default function AnalyticsPage() {
     setLoading(true);
     setError('');
     try {
-      const { data, error: attemptsError } = await supabase
+      const { data, count, error: attemptsError } = await supabase
         .from('test_attempts')
-        .select('id, score, total_marks, total_questions, correct_answers, wrong_answers, skipped, completed_at')
+        .select('id, score, total_marks, total_questions, correct_answers, wrong_answers, skipped, completed_at', { count: 'exact' })
         .eq('user_id', profile.id)
         .eq('status', 'completed')
-        .order('completed_at', { ascending: true })
+        .order('completed_at', { ascending: false })
         .limit(ANALYTICS_ATTEMPT_LIMIT);
       if (attemptsError) throw attemptsError;
-      setAttempts((data || []) as AnalyticsAttempt[]);
+      setAttempts([...(data || [])].reverse() as AnalyticsAttempt[]);
+      setAttemptTotal(count ?? data?.length ?? 0);
     } catch (err) {
       setError(getErrorMessage(err, 'Unable to load analytics.'));
     } finally {
@@ -102,7 +104,7 @@ export default function AnalyticsPage() {
   const accuracyData = attempts.map((a, i) => ({
     test: i + 1,
     accuracy: Math.round(getAccuracy(a.correct_answers, a.total_questions)),
-    score: Math.round((a.score / a.total_marks) * 100),
+    score: a.total_marks > 0 ? Math.round((a.score / a.total_marks) * 100) : 0,
   }));
 
   // Score distribution
@@ -114,18 +116,11 @@ export default function AnalyticsPage() {
     { range: '81-100', count: 0 },
   ];
   attempts.forEach((a) => {
-    const pct = Math.round((a.score / a.total_marks) * 100);
+    const pct = a.total_marks > 0 ? Math.round((a.score / a.total_marks) * 100) : 0;
     const idx = Math.min(Math.floor(pct / 20), 4);
     if (idx >= 0) scoreBuckets[idx].count++;
   });
 
-  // Difficulty analysis
-  const difficultyData = [
-    { name: 'Easy', attempted: 0, correct: 0 },
-    { name: 'Medium', attempted: 0, correct: 0 },
-    { name: 'Hard', attempted: 0, correct: 0 },
-  ];
-  // We approximate from attempts; real data would join user_answers with questions.
   const totalCorrect = attempts.reduce((s, a) => s + a.correct_answers, 0);
   const totalQ = attempts.reduce((s, a) => s + a.total_questions, 0);
   const avgAcc = totalQ ? Math.round((totalCorrect / totalQ) * 100) : 0;
@@ -142,11 +137,14 @@ export default function AnalyticsPage() {
 
   // Summary stats
   const avgScore = attempts.length
-    ? Math.round(attempts.reduce((s, a) => s + (a.score / a.total_marks) * 100, 0) / attempts.length)
+    ? Math.round(attempts.reduce((s, a) => s + (a.total_marks > 0 ? (a.score / a.total_marks) * 100 : 0), 0) / attempts.length)
     : 0;
   const bestScore = Math.round(
-    Math.max(...attempts.map((a) => (a.score / a.total_marks) * 100))
+    Math.max(...attempts.map((a) => (a.total_marks > 0 ? (a.score / a.total_marks) * 100 : 0)))
   );
+  const sampleNote = attemptTotal > attempts.length
+    ? `Showing latest ${attempts.length} of ${attemptTotal} attempts`
+    : `${attemptTotal} completed attempts`;
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -158,7 +156,7 @@ export default function AnalyticsPage() {
       {/* Summary Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Tests Taken', value: attempts.length },
+          { label: 'Tests Taken', value: attemptTotal },
           { label: 'Avg Score', value: `${avgScore}%` },
           { label: 'Best Score', value: `${bestScore}%` },
           { label: 'Accuracy', value: `${avgAcc}%` },
@@ -169,6 +167,7 @@ export default function AnalyticsPage() {
           </Card>
         ))}
       </div>
+      <p className="text-[11px] text-[var(--fg-muted)]">{sampleNote}</p>
 
       {/* Charts 2x2 grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

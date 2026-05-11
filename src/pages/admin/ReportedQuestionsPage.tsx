@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { usePageStore } from '../../stores/pageStore';
 import { Card, CardHeader, CardTitle } from '../../components/ui/Card';
@@ -14,6 +15,7 @@ import { Flag, CheckCircle, XCircle } from 'lucide-react';
 
 interface ReportItem {
   id: string;
+  question_id: string;
   reason: string;
   description: string | null;
   status: 'pending' | 'reviewed' | 'resolved' | 'dismissed';
@@ -118,6 +120,14 @@ export default function ReportedQuestionsPage() {
             <span className="font-medium">Details:</span> {r.description}
           </p>
         )}
+        <div className="mt-2">
+          <Link
+            to={`/admin/questions?question=${r.question_id}`}
+            className="inline-flex h-8 items-center justify-center rounded-full border border-[var(--border-strong)] bg-[var(--bg-surface)] px-3 text-[11px] font-medium text-[var(--fg)] shadow-xs transition hover:border-[#B0BEC5] hover:bg-[var(--bg-surface-hover)] focus-ring"
+          >
+            Edit question
+          </Link>
+        </div>
         {isPending && (
           <div className="mt-2 space-y-1.5">
             <Input

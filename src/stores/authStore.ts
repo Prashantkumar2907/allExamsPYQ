@@ -6,6 +6,7 @@ import type { Session, User } from '@supabase/supabase-js';
 let authListenerRegistered = false;
 type SupabaseClientLike = typeof import('../lib/supabase').supabase;
 let supabaseClientPromise: Promise<SupabaseClientLike> | null = null;
+let profileFetchVersion = 0;
 
 async function getSupabaseClient() {
   supabaseClientPromise ??= import('../lib/supabase').then((module) => module.supabase);
@@ -53,7 +54,8 @@ export const useAuthStore = create<AuthState>()(
         if (!authListenerRegistered) {
           authListenerRegistered = true;
           supabase.auth.onAuthStateChange(async (_event, session) => {
-            set({ user: session?.user ?? null, session });
+            profileFetchVersion++;
+            set({ user: session?.user ?? null, session, profile: null, profileError: null });
             if (session?.user) {
               await get().fetchProfile(session.user.id);
             } else {
@@ -65,7 +67,8 @@ export const useAuthStore = create<AuthState>()(
         try {
           const { data: { session } } = await supabase.auth.getSession();
           if (session?.user) {
-            set({ user: session.user, session });
+            profileFetchVersion++;
+            set({ user: session.user, session, profile: null, profileError: null });
             await get().fetchProfile(session.user.id);
           }
         } finally {
@@ -75,12 +78,14 @@ export const useAuthStore = create<AuthState>()(
 
       fetchProfile: async (userId: string) => {
         const supabase = await getSupabaseClient();
+        const fetchVersion = ++profileFetchVersion;
         set({ profileError: null });
         const { data, error } = await supabase
           .from('profiles')
           .select('*, exam:exams(*)')
           .eq('id', userId)
           .single();
+        if (fetchVersion !== profileFetchVersion || get().user?.id !== userId) return;
         if (error) {
           set({ profile: null, profileError: getErrorMessage(error, 'Unable to load your profile.') });
           return;
@@ -94,7 +99,8 @@ export const useAuthStore = create<AuthState>()(
           const supabase = await getSupabaseClient();
           const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
           if (!error && data.session?.user) {
-            set({ user: data.session.user, session: data.session });
+            profileFetchVersion++;
+            set({ user: data.session.user, session: data.session, profile: null, profileError: null });
             await get().fetchProfile(data.session.user.id);
           }
           return { error: error?.message ?? null };
@@ -115,7 +121,8 @@ export const useAuthStore = create<AuthState>()(
             options: { data: { full_name: normalizeText(fullName), exam_id: examId } },
           });
           if (!error && data.session?.user) {
-            set({ user: data.session.user, session: data.session });
+            profileFetchVersion++;
+            set({ user: data.session.user, session: data.session, profile: null, profileError: null });
             await get().fetchProfile(data.session.user.id);
           }
           return { error: error?.message ?? null };
@@ -129,6 +136,7 @@ export const useAuthStore = create<AuthState>()(
       signOut: async () => {
         const supabase = await getSupabaseClient();
         await supabase.auth.signOut();
+        profileFetchVersion++;
         set({ user: null, profile: null, session: null, profileError: null });
       },
 
