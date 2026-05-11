@@ -41,7 +41,10 @@ const UserAnalytics = lazy(() => import('./pages/admin/UserAnalyticsPage'));
 const AdminProfile = lazy(() => import('./pages/admin/ProfilePage'));
 
 function AuthGuard() {
-  const { user, loading, initialized, profile } = useAuthStore();
+  const { user, loading, initialized, initialize } = useAuthStore();
+  useEffect(() => {
+    if (!initialized && loading) void initialize();
+  }, [initialized, loading, initialize]);
   if (!initialized || loading) return <LoadingSpinner />;
   if (!user) return <Navigate to="/login" replace />;
   return <Outlet />;
@@ -49,6 +52,10 @@ function AuthGuard() {
 
 function GuestGuard() {
   const { user, profile, profileError, fetchProfile, loading, initialized } = useAuthStore();
+  const initialize = useAuthStore((state) => state.initialize);
+  useEffect(() => {
+    if (!initialized && loading) void initialize();
+  }, [initialized, loading, initialize]);
   if (!initialized || loading) return <LoadingSpinner />;
   if (user) {
     if (profileError) return <ErrorState description={profileError} onRetry={() => fetchProfile(user.id)} />;
@@ -74,8 +81,8 @@ const router = createBrowserRouter(
   createRoutesFromElements(
     <>
       {/* Guest routes */}
+      <Route path="/" element={<LandingPage />} />
       <Route element={<GuestGuard />}>
-        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
       </Route>
@@ -117,12 +124,6 @@ const router = createBrowserRouter(
 );
 
 export default function App() {
-  const { initialize } = useAuthStore();
-
-  useEffect(() => {
-    initialize();
-  }, [initialize]);
-
   return (
     <>
       <PWAInstallPrompt />

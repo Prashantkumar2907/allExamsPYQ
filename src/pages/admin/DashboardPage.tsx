@@ -33,6 +33,20 @@ interface RecentAttempt {
   profile: { full_name: string } | null;
 }
 
+interface AdminDashboardSummary {
+  stats: {
+    users: number;
+    exams: number;
+    questions: number;
+    tests: number;
+    attempts: number;
+  };
+  reported_count: number;
+  difficulty_data: { name: string; count: number }[];
+  daily_attempts: { date: string; label: string; count: number }[];
+  recent_attempts: RecentAttempt[];
+}
+
 export default function DashboardPage() {
   const setPage = usePageStore((s) => s.setPage);
   const navigate = useNavigate();
@@ -53,63 +67,21 @@ export default function DashboardPage() {
     setLoading(true);
     setError('');
     try {
-      const difficulties = ['easy', 'medium', 'hard'] as const;
-      const dayWindows = Array.from({ length: 7 }, (_, index) => {
-        const start = new Date();
-        start.setHours(0, 0, 0, 0);
-        start.setDate(start.getDate() - (6 - index));
-        const end = new Date(start);
-        end.setDate(end.getDate() + 1);
-        return {
-          date: start.toLocaleDateString('en-US', { weekday: 'short' }),
-          start: start.toISOString(),
-          end: end.toISOString(),
-        };
+      const { data, error: summaryError } = await supabase.rpc('get_admin_dashboard_summary', {
+        p_days: 7,
+        p_recent_limit: 5,
       });
 
-      const [usersRes, examsRes, questionsRes, testsRes, attemptsRes, recentRes, reportRes, ...metricRes] = await Promise.all([
-        supabase.from('profiles').select('id', { count: 'exact', head: true }),
-        supabase.from('exams').select('id', { count: 'exact', head: true }),
-        supabase.from('questions').select('id', { count: 'exact', head: true }),
-        supabase.from('tests').select('id', { count: 'exact', head: true }),
-        supabase.from('test_attempts').select('id', { count: 'exact', head: true }),
-        supabase.from('test_attempts').select('id, source_name, score, total_marks, completed_at, profile:profiles!user_id(full_name)').eq('status', 'completed').order('completed_at', { ascending: false }).limit(5),
-        supabase.from('reported_questions').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-        ...difficulties.map((difficulty) => supabase.from('questions').select('id', { count: 'exact', head: true }).eq('difficulty', difficulty)),
-        ...dayWindows.map((day) =>
-          supabase
-            .from('test_attempts')
-            .select('id', { count: 'exact', head: true })
-            .eq('status', 'completed')
-            .gte('completed_at', day.start)
-            .lt('completed_at', day.end)
-        ),
-      ]);
+      if (summaryError) throw summaryError;
+      if (!data) throw new Error('Dashboard summary returned no data.');
 
-      [usersRes, examsRes, questionsRes, testsRes, attemptsRes, recentRes, reportRes, ...metricRes].forEach((res) => {
-        if (res.error) throw res.error;
-      });
+      const summary = data as AdminDashboardSummary;
 
-      setStats({
-        users: usersRes.count || 0,
-        exams: examsRes.count || 0,
-        questions: questionsRes.count || 0,
-        tests: testsRes.count || 0,
-        attempts: attemptsRes.count || 0,
-      });
-
-      if (recentRes.data) setRecentAttempts(recentRes.data as unknown as RecentAttempt[]);
-      setReportedCount(reportRes.count || 0);
-
-      const difficultyResults = metricRes.slice(0, difficulties.length);
-      setDifficultyData(
-        difficulties
-          .map((name, index) => ({ name, count: difficultyResults[index]?.count || 0 }))
-          .filter((item) => item.count > 0)
-      );
-
-      const dailyResults = metricRes.slice(difficulties.length);
-      setDailyAttempts(dayWindows.map((day, index) => ({ date: day.date, count: dailyResults[index]?.count || 0 })));
+      setStats(summary.stats);
+      setReportedCount(summary.reported_count);
+      setRecentAttempts(summary.recent_attempts);
+      setDifficultyData(summary.difficulty_data);
+      setDailyAttempts(summary.daily_attempts.map((day) => ({ date: day.label.trim(), count: day.count })));
     } catch (err) { setError(getErrorMessage(err, 'Unable to load admin dashboard.')); }
     finally { setLoading(false); }
   }

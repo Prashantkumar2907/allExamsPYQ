@@ -326,7 +326,7 @@ export default function TestTakingPage() {
             <div className="max-w-2xl mx-auto space-y-4 animate-fade-in" key={question.id}>
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-[var(--fg-muted)]">
-                  Question {currentIdx + 1} <span className="text-[var(--fg-muted)]/60">of {questions.length}</span>
+                  Question {currentIdx + 1} <span className="text-[var(--fg-muted)]">of {questions.length}</span>
                 </span>
                 <button
                   onClick={() =>

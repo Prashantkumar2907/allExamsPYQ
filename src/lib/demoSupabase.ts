@@ -481,6 +481,78 @@ function getTopicExamId(state: DemoState, topicId: string) {
   return subject?.exam_id ?? null;
 }
 
+function getAdminDashboardSummary(params: Record<string, unknown>): QueryResult<Record<string, unknown>> {
+  const state = loadState();
+  const profile = getCurrentProfile(state);
+  if (profile?.role !== 'admin') {
+    return { data: null, error: { message: 'Only admins can read admin dashboard summary.' } };
+  }
+
+  const requestedDays = Number(params.p_days ?? 7);
+  const days = Math.min(Math.max(Number.isFinite(requestedDays) ? requestedDays : 7, 1), 30);
+  const requestedRecentLimit = Number(params.p_recent_limit ?? 5);
+  const recentLimit = Math.min(Math.max(Number.isFinite(requestedRecentLimit) ? requestedRecentLimit : 5, 1), 25);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const daily_attempts = Array.from({ length: days }, (_, index) => {
+    const day = new Date(today);
+    day.setDate(today.getDate() - (days - index - 1));
+    const nextDay = new Date(day);
+    nextDay.setDate(day.getDate() + 1);
+    const count = state.test_attempts.filter((attempt) => {
+      if (attempt.status !== 'completed' || !attempt.completed_at) return false;
+      const completedAt = new Date(attempt.completed_at).getTime();
+      return completedAt >= day.getTime() && completedAt < nextDay.getTime();
+    }).length;
+    return {
+      date: day.toISOString().slice(0, 10),
+      label: day.toLocaleDateString('en-US', { weekday: 'short' }),
+      count,
+    };
+  });
+
+  const difficulty_data = (['easy', 'medium', 'hard'] as const)
+    .map((name) => ({
+      name,
+      count: state.questions.filter((question) => question.difficulty === name).length,
+    }))
+    .filter((item) => item.count > 0);
+
+  const recent_attempts = state.test_attempts
+    .filter((attempt) => attempt.status === 'completed')
+    .sort((left, right) => (right.completed_at ?? '').localeCompare(left.completed_at ?? ''))
+    .slice(0, recentLimit)
+    .map((attempt) => {
+      const attemptProfile = state.profiles.find((item) => item.id === attempt.user_id);
+      return {
+        id: attempt.id,
+        source_name: attempt.source_name,
+        score: attempt.score,
+        total_marks: attempt.total_marks,
+        completed_at: attempt.completed_at,
+        profile: { full_name: attemptProfile?.full_name ?? 'Unknown' },
+      };
+    });
+
+  return {
+    data: {
+      stats: {
+        users: state.profiles.length,
+        exams: state.exams.length,
+        questions: state.questions.length,
+        tests: state.tests.length,
+        attempts: state.test_attempts.length,
+      },
+      reported_count: state.reported_questions.filter((report) => report.status === 'pending').length,
+      difficulty_data,
+      daily_attempts,
+      recent_attempts,
+    },
+    error: null,
+  };
+}
+
 function createAttemptWithAnswers(
   state: DemoState,
   attemptPayload: DemoRow,
@@ -627,6 +699,17 @@ export const demoSupabase = {
     return new DemoQuery(table);
   },
   async rpc(functionName: string, params: Record<string, unknown>) {
+    if (functionName === 'count_exam_topics') {
+      const state = loadState();
+      const examId = String(params.p_exam_id ?? '');
+      const count = state.topics.filter((topic) => getTopicExamId(state, topic.id) === examId).length;
+      return { data: count, error: null };
+    }
+
+    if (functionName === 'get_admin_dashboard_summary') {
+      return getAdminDashboardSummary(params);
+    }
+
     if (functionName === 'get_leaderboard') {
       const state = loadState();
       const examId = String(params.p_exam_id ?? '');

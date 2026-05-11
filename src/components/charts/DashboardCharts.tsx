@@ -66,8 +66,12 @@ export function StudentQuestionStatusChart({ data }: { data: PiePoint[] }) {
     <ResponsiveContainer width="100%" height="100%">
       <PieChart>
         <Pie data={data} cx="50%" cy="50%" innerRadius={40} outerRadius={60} dataKey="value" paddingAngle={3} strokeWidth={0}>
-          {data.map((_, i) => (
-            <Cell key={i} fill={[CHART_COLORS[0], '#d45a5a', CHART_COLORS[3]][i]} />
+          {data.map((item, i) => (
+            <Cell
+              key={item.name}
+              fill={[CHART_COLORS[0], '#d45a5a', CHART_COLORS[3]][i]}
+              aria-label={`${item.name}: ${item.value}`}
+            />
           ))}
         </Pie>
         <Tooltip contentStyle={tooltipStyle} />
@@ -94,7 +98,13 @@ export function AdminDifficultyChart({ data }: { data: DifficultyPoint[] }) {
     <ResponsiveContainer width="100%" height="100%">
       <PieChart>
         <Pie data={data} cx="50%" cy="50%" innerRadius={35} outerRadius={55} dataKey="count" paddingAngle={3} strokeWidth={0}>
-          {data.map((d) => <Cell key={d.name} fill={DIFFICULTY_COLORS[d.name] || CHART_COLORS[3]} />)}
+          {data.map((d) => (
+            <Cell
+              key={d.name}
+              fill={DIFFICULTY_COLORS[d.name] || CHART_COLORS[3]}
+              aria-label={`${d.name}: ${d.count}`}
+            />
+          ))}
         </Pie>
         <Tooltip contentStyle={tooltipStyle} />
       </PieChart>

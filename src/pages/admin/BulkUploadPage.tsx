@@ -68,6 +68,95 @@ const sampleRow = ['JEE Main', 'Physics', 'Mechanics', 'Newton Laws', 'What is N
       const total = rows.length;
       let success = 0;
       const errors: string[] = [...parseErrors];
+      const keyFor = (value: string) => value.trim().toLowerCase();
+      const examCache = new Map<string, { id: string; name: string }>();
+      const subjectCache = new Map<string, Map<string, { id: string; name: string }>>();
+      const chapterCache = new Map<string, Map<string, { id: string; name: string }>>();
+      const topicCache = new Map<string, Map<string, { id: string; name: string }>>();
+
+      const { data: existingExams, error: examsError } = await supabase.from('exams').select('id, name');
+      if (examsError) throw examsError;
+      (existingExams || []).forEach((exam) => examCache.set(keyFor(exam.name), exam));
+
+      async function ensureExam(name: string) {
+        const key = keyFor(name);
+        const cached = examCache.get(key);
+        if (cached) return cached;
+        const { data, error } = await supabase.from('exams').insert({ name }).select('id, name').single();
+        if (error) throw error;
+        if (!data) throw new Error(`Failed to create exam "${name}".`);
+        examCache.set(key, data);
+        return data;
+      }
+
+      async function subjectsFor(examId: string) {
+        const cached = subjectCache.get(examId);
+        if (cached) return cached;
+        const { data, error } = await supabase.from('subjects').select('id, name').eq('exam_id', examId);
+        if (error) throw error;
+        const map = new Map<string, { id: string; name: string }>();
+        (data || []).forEach((subject) => map.set(keyFor(subject.name), subject));
+        subjectCache.set(examId, map);
+        return map;
+      }
+
+      async function ensureSubject(examId: string, name: string) {
+        const subjects = await subjectsFor(examId);
+        const key = keyFor(name);
+        const cached = subjects.get(key);
+        if (cached) return cached;
+        const { data, error } = await supabase.from('subjects').insert({ exam_id: examId, name }).select('id, name').single();
+        if (error) throw error;
+        if (!data) throw new Error(`Failed to create subject "${name}".`);
+        subjects.set(key, data);
+        return data;
+      }
+
+      async function chaptersFor(subjectId: string) {
+        const cached = chapterCache.get(subjectId);
+        if (cached) return cached;
+        const { data, error } = await supabase.from('chapters').select('id, name').eq('subject_id', subjectId);
+        if (error) throw error;
+        const map = new Map<string, { id: string; name: string }>();
+        (data || []).forEach((chapter) => map.set(keyFor(chapter.name), chapter));
+        chapterCache.set(subjectId, map);
+        return map;
+      }
+
+      async function ensureChapter(subjectId: string, name: string) {
+        const chapters = await chaptersFor(subjectId);
+        const key = keyFor(name);
+        const cached = chapters.get(key);
+        if (cached) return cached;
+        const { data, error } = await supabase.from('chapters').insert({ subject_id: subjectId, name }).select('id, name').single();
+        if (error) throw error;
+        if (!data) throw new Error(`Failed to create chapter "${name}".`);
+        chapters.set(key, data);
+        return data;
+      }
+
+      async function topicsFor(chapterId: string) {
+        const cached = topicCache.get(chapterId);
+        if (cached) return cached;
+        const { data, error } = await supabase.from('topics').select('id, name').eq('chapter_id', chapterId);
+        if (error) throw error;
+        const map = new Map<string, { id: string; name: string }>();
+        (data || []).forEach((topic) => map.set(keyFor(topic.name), topic));
+        topicCache.set(chapterId, map);
+        return map;
+      }
+
+      async function ensureTopic(chapterId: string, name: string) {
+        const topics = await topicsFor(chapterId);
+        const key = keyFor(name);
+        const cached = topics.get(key);
+        if (cached) return cached;
+        const { data, error } = await supabase.from('topics').insert({ chapter_id: chapterId, name }).select('id, name').single();
+        if (error) throw error;
+        if (!data) throw new Error(`Failed to create topic "${name}".`);
+        topics.set(key, data);
+        return data;
+      }
 
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
@@ -127,40 +216,10 @@ const sampleRow = ['JEE Main', 'Physics', 'Mechanics', 'Newton Laws', 'What is N
             continue;
           }
 
-          let { data: exam, error: examLookupError } = await supabase.from('exams').select('id').eq('name', examName).single();
-          if (examLookupError && examLookupError.message !== 'No rows returned in demo mode.') {
-            exam = null;
-          }
-          if (!exam) {
-            const { data: newExam, error: examCreateError } = await supabase.from('exams').insert({ name: examName }).select().single();
-            if (examCreateError) throw examCreateError;
-            exam = newExam;
-          }
-          if (!exam) { errors.push(`Row ${i + 2}: Failed to find/create exam`); continue; }
-
-          let { data: subject } = await supabase.from('subjects').select('id').eq('exam_id', exam.id).eq('name', subjectName).single();
-          if (!subject) {
-            const { data: newSub, error: subjectCreateError } = await supabase.from('subjects').insert({ exam_id: exam.id, name: subjectName }).select().single();
-            if (subjectCreateError) throw subjectCreateError;
-            subject = newSub;
-          }
-          if (!subject) { errors.push(`Row ${i + 2}: Failed to find/create subject`); continue; }
-
-          let { data: chapter } = await supabase.from('chapters').select('id').eq('subject_id', subject.id).eq('name', chapterName).single();
-          if (!chapter) {
-            const { data: newCh, error: chapterCreateError } = await supabase.from('chapters').insert({ subject_id: subject.id, name: chapterName }).select().single();
-            if (chapterCreateError) throw chapterCreateError;
-            chapter = newCh;
-          }
-          if (!chapter) { errors.push(`Row ${i + 2}: Failed to find/create chapter`); continue; }
-
-          let { data: topic } = await supabase.from('topics').select('id').eq('chapter_id', chapter.id).eq('name', topicName).single();
-          if (!topic) {
-            const { data: newTp, error: topicCreateError } = await supabase.from('topics').insert({ chapter_id: chapter.id, name: topicName }).select().single();
-            if (topicCreateError) throw topicCreateError;
-            topic = newTp;
-          }
-          if (!topic) { errors.push(`Row ${i + 2}: Failed to find/create topic`); continue; }
+          const exam = await ensureExam(examName);
+          const subject = await ensureSubject(exam.id, subjectName);
+          const chapter = await ensureChapter(subject.id, chapterName);
+          const topic = await ensureTopic(chapter.id, topicName);
 
           const { data: question, error: questionCreateError } = await supabase.from('questions').insert({
             topic_id: topic.id,

@@ -79,11 +79,8 @@ export default function DashboardPage() {
         .select('topic_id, is_completed')
         .eq('user_id', profile!.id),
       profile!.exam_id
-        ? supabase
-            .from('topics')
-            .select('id', { count: 'exact', head: true })
-            .eq('chapters.subjects.exam_id', profile!.exam_id)
-        : Promise.resolve({ data: null, count: 0 }),
+        ? supabase.rpc('count_exam_topics', { p_exam_id: profile!.exam_id })
+        : Promise.resolve({ data: 0, error: null }),
       supabase
         .from('tests')
         .select('title, scheduled_at')
@@ -101,7 +98,7 @@ export default function DashboardPage() {
 
     if (attRes.data) setAttempts(attRes.data);
     if (sylRes.data) setSyllabusProgress(sylRes.data as SyllabusProgress[]);
-    if (topRes.count != null) setTotalTopics(topRes.count);
+    setTotalTopics(Number(topRes.data ?? 0));
     if (testRes.data?.[0]) setNextTest(testRes.data[0] as { title: string; scheduled_at: string });
     } catch (e) {
       setError(getErrorMessage(e, 'Unable to load dashboard data.'));
