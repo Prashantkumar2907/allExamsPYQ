@@ -186,7 +186,7 @@ export default function BookmarksPage() {
           return (
             <div
               key={bm.id}
-              className="flex items-center gap-3 px-3.5 py-2.5 hover:bg-[var(--bg-surface-hover)] cursor-pointer transition-colors group"
+              className="flex items-center gap-3 px-3.5 py-2.5 hover:bg-[var(--bg-surface-hover)] cursor-pointer transition-colors group focus-ring"
               onClick={() => openSheet(bm)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
@@ -218,7 +218,7 @@ export default function BookmarksPage() {
               <div className="flex items-center gap-1 flex-shrink-0">
                 <button
                   onClick={(e) => { e.stopPropagation(); removeBookmark(bm.id); }}
-                  className="h-7 w-7 flex items-center justify-center rounded-md text-[var(--fg-muted)] hover:text-red-500 hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100"
+                  className="h-7 w-7 flex items-center justify-center rounded-md text-[var(--fg-muted)] hover:text-red-500 hover:bg-red-500/10 transition-colors opacity-100 sm:opacity-80 sm:group-hover:opacity-100 focus-ring"
                   aria-label="Remove bookmark"
                 >
                   <Trash2 className="h-3.5 w-3.5" />

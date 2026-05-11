@@ -44,7 +44,7 @@ interface DifficultyPoint {
 export function StudentTrendChart({ data }: { data: StudentTrendPoint[] }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <AreaChart data={data}>
+      <AreaChart data={data} accessibilityLayer={false}>
         <defs>
           <linearGradient id="scoreFill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={CHART_COLORS[0]} stopOpacity={0.3} />
@@ -64,8 +64,8 @@ export function StudentTrendChart({ data }: { data: StudentTrendPoint[] }) {
 export function StudentQuestionStatusChart({ data }: { data: PiePoint[] }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <PieChart>
-        <Pie data={data} cx="50%" cy="50%" innerRadius={40} outerRadius={60} dataKey="value" paddingAngle={3} strokeWidth={0}>
+      <PieChart accessibilityLayer={false}>
+        <Pie data={data} cx="50%" cy="50%" innerRadius={40} outerRadius={60} dataKey="value" paddingAngle={3} strokeWidth={0} rootTabIndex={-1}>
           {data.map((item, i) => (
             <Cell
               key={item.name}
@@ -83,7 +83,7 @@ export function StudentQuestionStatusChart({ data }: { data: PiePoint[] }) {
 export function AdminDailyAttemptsChart({ data }: { data: AdminDailyPoint[] }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={data}>
+      <BarChart data={data} accessibilityLayer={false}>
         <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} axisLine={false} tickLine={false} />
         <YAxis tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} axisLine={false} tickLine={false} allowDecimals={false} />
         <Tooltip contentStyle={tooltipStyle} />
@@ -96,8 +96,8 @@ export function AdminDailyAttemptsChart({ data }: { data: AdminDailyPoint[] }) {
 export function AdminDifficultyChart({ data }: { data: DifficultyPoint[] }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <PieChart>
-        <Pie data={data} cx="50%" cy="50%" innerRadius={35} outerRadius={55} dataKey="count" paddingAngle={3} strokeWidth={0}>
+      <PieChart accessibilityLayer={false}>
+        <Pie data={data} cx="50%" cy="50%" innerRadius={35} outerRadius={55} dataKey="count" paddingAngle={3} strokeWidth={0} rootTabIndex={-1}>
           {data.map((d) => (
             <Cell
               key={d.name}

@@ -40,25 +40,38 @@ export default function UserAnalyticsPage() {
 
   useEffect(() => {
     setPage('User Analytics', 'Monitor student performance');
-    void loadStudents();
-  }, []);
+  }, [setPage]);
 
-  async function loadStudents(append = false) {
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      void loadStudents(false, search);
+    }, 250);
+    return () => window.clearTimeout(timeout);
+  }, [search]);
+
+  async function loadStudents(append = false, searchTerm = search) {
     const from = append ? students.length : 0;
+    const normalizedSearch = searchTerm.trim();
     if (append) setLoadingMore(true);
     else setLoading(true);
     setError('');
     try {
-      const { data, count, error: studentsError } = await supabase
+      let query = supabase
         .from('profiles')
         .select('*, exam:exams(name)', { count: 'exact' })
         .eq('role', 'student')
-        .order('created_at', { ascending: false })
-        .range(from, from + PAGE_SIZE - 1);
+        .order('created_at', { ascending: false });
+
+      if (normalizedSearch) {
+        const safeSearch = normalizedSearch.replace(/[%,]/g, ' ').trim();
+        query = query.or(`full_name.ilike.%${safeSearch}%,email.ilike.%${safeSearch}%`);
+      }
+
+      const { data, count, error: studentsError } = await query.range(from, from + PAGE_SIZE - 1);
       if (studentsError) throw studentsError;
       if (data) {
         setStudents(prev => append ? [...prev, ...(data as StudentProfile[])] : data as StudentProfile[]);
-        setHasMore(data.length === PAGE_SIZE);
+        setHasMore(count != null ? from + data.length < count : data.length === PAGE_SIZE);
       }
       if (count != null) setTotalCount(count);
     } catch (err) {
@@ -84,13 +97,7 @@ export default function UserAnalyticsPage() {
   }
   if (error) return <ErrorState description={error} onRetry={() => loadStudents()} />;
 
-  const filtered = search
-    ? students.filter(
-        (s) =>
-          s.full_name.toLowerCase().includes(search.toLowerCase()) ||
-          s.email.toLowerCase().includes(search.toLowerCase())
-      )
-    : students;
+  const filtered = students;
 
   return (
     <div className="space-y-5 animate-fade-in">
@@ -118,7 +125,7 @@ export default function UserAnalyticsPage() {
       ) : (
         <div className="grid gap-2">
           {filtered.map((s) => (
-            <Card key={s.id} className="flex items-center gap-3 cursor-pointer hover:-translate-y-[1px] hover:shadow-md hover:border-[var(--primary)]/30 transition">
+            <Card key={s.id} className="flex items-center gap-3">
               <Avatar name={s.full_name} src={s.avatar_url || undefined} size="sm" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-[var(--fg)] truncate">{s.full_name}</p>

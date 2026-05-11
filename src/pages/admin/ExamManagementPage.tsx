@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type KeyboardEvent } from 'react';
 import { supabase } from '../../lib/supabase';
 import { usePageStore } from '../../stores/pageStore';
 import { Card, CardHeader, CardTitle } from '../../components/ui/Card';
@@ -204,6 +204,12 @@ export default function ExamManagementPage() {
 
   const levelIcons = { exams: BookOpen, subjects: Folder, chapters: FileText, topics: Tag };
 
+  function handleSelectKey(event: KeyboardEvent<HTMLElement>, action?: () => void) {
+    if (!action || (event.key !== 'Enter' && event.key !== ' ')) return;
+    event.preventDefault();
+    action();
+  }
+
   function renderList<T extends HierarchyItem>(items: T[], level: Level, onSelect?: (item: T) => void, selectedId?: string) {
     const Icon = levelIcons[level];
     return (
@@ -222,27 +228,31 @@ export default function ExamManagementPage() {
         {items.map((item) => (
           <div
             key={item.id}
+            role={onSelect ? 'button' : undefined}
+            tabIndex={onSelect ? 0 : undefined}
             className={cn(
-              'flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer transition duration-150 group',
+              'flex items-center gap-2 px-2.5 py-2 rounded-lg transition duration-150 group',
+              onSelect && 'cursor-pointer focus-ring',
               selectedId === item.id
                 ? 'bg-[var(--primary)]/10 text-[var(--primary)] shadow-sm'
                 : 'hover:bg-[var(--bg-surface-hover)] hover:-translate-y-[1px] hover:shadow-sm text-[var(--fg)]'
             )}
             onClick={() => onSelect?.(item)}
+            onKeyDown={(event) => handleSelectKey(event, onSelect ? () => onSelect(item) : undefined)}
           >
             {onSelect && <ChevronRight className="h-3 w-3 flex-shrink-0" />}
             <span className="flex-1 text-xs truncate">{item.name}</span>
-            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-0.5 opacity-100 transition-opacity sm:opacity-80 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
               <button
                 onClick={(e) => { e.stopPropagation(); openEdit(level, item); }}
-                className="h-5 w-5 flex items-center justify-center rounded text-[var(--fg-muted)] hover:text-[var(--primary)] cursor-pointer"
+                className="h-5 w-5 flex items-center justify-center rounded text-[var(--fg-muted)] hover:text-[var(--primary)] cursor-pointer focus-ring"
                 aria-label={`Edit ${item.name}`}
               >
                 <Pencil className="h-2.5 w-2.5" />
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); requestDelete(level, item); }}
-                className="h-5 w-5 flex items-center justify-center rounded text-[var(--fg-muted)] hover:text-red-400 cursor-pointer"
+                className="h-5 w-5 flex items-center justify-center rounded text-[var(--fg-muted)] hover:text-red-400 cursor-pointer focus-ring"
                 aria-label={`Delete ${item.name}`}
               >
                 <Trash2 className="h-2.5 w-2.5" />

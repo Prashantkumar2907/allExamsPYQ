@@ -383,11 +383,11 @@ export default function TestManagementPage() {
                   <p className="text-sm font-medium text-[var(--fg)] truncate">{t.title}</p>
                   <p className="text-[10px] text-[var(--fg-muted)]">{t.exam?.name || 'No exam'}</p>
                 </div>
-                <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                  <button onClick={() => openEdit(t)} className="h-6 w-6 flex items-center justify-center rounded text-[var(--fg-muted)] hover:text-[var(--primary)] cursor-pointer" aria-label="Edit test">
+                <div className="flex gap-0.5 opacity-100 transition-opacity flex-shrink-0 sm:opacity-80 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+                  <button onClick={() => openEdit(t)} className="h-6 w-6 flex items-center justify-center rounded text-[var(--fg-muted)] hover:text-[var(--primary)] cursor-pointer focus-ring" aria-label="Edit test">
                     <Pencil className="h-3 w-3" />
                   </button>
-                  <button onClick={() => setDeleteTestId(t.id)} className="h-6 w-6 flex items-center justify-center rounded text-[var(--fg-muted)] hover:text-red-400 cursor-pointer" aria-label="Delete test">
+                  <button onClick={() => setDeleteTestId(t.id)} className="h-6 w-6 flex items-center justify-center rounded text-[var(--fg-muted)] hover:text-red-400 cursor-pointer focus-ring" aria-label="Delete test">
                     <Trash2 className="h-3 w-3" />
                   </button>
                 </div>

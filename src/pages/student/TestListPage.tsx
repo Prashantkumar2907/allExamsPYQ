@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type KeyboardEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
 import { usePageStore } from '../../stores/pageStore';
@@ -99,6 +99,12 @@ export default function TestListPage() {
       setCompletedTestIds(new Set(data.map((attempt) => attempt.test_id).filter(Boolean) as string[]));
     }
     setHistoryPage(page);
+  }
+
+  function handleActionKey(event: KeyboardEvent<HTMLElement>, action: () => void) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    action();
   }
 
   async function startTest(test: Test) {
@@ -239,8 +245,12 @@ export default function TestListPage() {
                 return (
                   <div
                     key={att.id}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`View result for ${att.source_name}`}
                     onClick={() => navigate(`/result/${att.id}`)}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-surface-hover)] transition duration-150 cursor-pointer group"
+                    onKeyDown={(event) => handleActionKey(event, () => navigate(`/result/${att.id}`))}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-strong)] hover:bg-[var(--bg-surface-hover)] transition duration-150 cursor-pointer group focus-ring"
                   >
                     {/* Score circle */}
                     <div className={cn(

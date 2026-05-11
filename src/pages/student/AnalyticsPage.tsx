@@ -15,6 +15,20 @@ import {
 } from 'recharts';
 import type { TestAttempt } from '../../types/database';
 
+type AnalyticsAttempt = Pick<
+  TestAttempt,
+  | 'id'
+  | 'score'
+  | 'total_marks'
+  | 'total_questions'
+  | 'correct_answers'
+  | 'wrong_answers'
+  | 'skipped'
+  | 'completed_at'
+>;
+
+const ANALYTICS_ATTEMPT_LIMIT = 200;
+
 const tooltipStyle = {
   background: 'var(--bg-surface)',
   border: '1px solid var(--border)',
@@ -27,7 +41,7 @@ export default function AnalyticsPage() {
   const setPage = usePageStore((s) => s.setPage);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [attempts, setAttempts] = useState<TestAttempt[]>([]);
+  const [attempts, setAttempts] = useState<AnalyticsAttempt[]>([]);
 
   useEffect(() => {
     setPage('Analytics', 'Track your performance');
@@ -45,12 +59,13 @@ export default function AnalyticsPage() {
     try {
       const { data, error: attemptsError } = await supabase
         .from('test_attempts')
-        .select('*')
+        .select('id, score, total_marks, total_questions, correct_answers, wrong_answers, skipped, completed_at')
         .eq('user_id', profile.id)
         .eq('status', 'completed')
-        .order('completed_at', { ascending: true });
+        .order('completed_at', { ascending: true })
+        .limit(ANALYTICS_ATTEMPT_LIMIT);
       if (attemptsError) throw attemptsError;
-      setAttempts(data || []);
+      setAttempts((data || []) as AnalyticsAttempt[]);
     } catch (err) {
       setError(getErrorMessage(err, 'Unable to load analytics.'));
     } finally {
@@ -167,7 +182,7 @@ export default function AnalyticsPage() {
           </CardHeader>
           <div className="h-52">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={monthlyData}>
+              <BarChart data={monthlyData} accessibilityLayer={false}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} />
                 <XAxis dataKey="month" tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} />
                 <YAxis tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} allowDecimals={false} />
@@ -188,7 +203,7 @@ export default function AnalyticsPage() {
           </CardHeader>
           <div className="h-52">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={accuracyData}>
+              <LineChart data={accuracyData} accessibilityLayer={false}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} />
                 <XAxis dataKey="test" tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} label={{ value: 'Test #', fontSize: 10, fill: 'var(--fg-muted)' }} />
                 <YAxis tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} domain={[0, 100]} />
@@ -214,7 +229,7 @@ export default function AnalyticsPage() {
           </CardHeader>
           <div className="h-52">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={scoreBuckets}>
+              <BarChart data={scoreBuckets} accessibilityLayer={false}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} />
                 <XAxis dataKey="range" tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} />
                 <YAxis tick={{ fontSize: 10, fill: 'var(--fg-muted)' }} allowDecimals={false} />
@@ -237,8 +252,8 @@ export default function AnalyticsPage() {
           </CardHeader>
           <div className="h-44">
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={donutData} cx="50%" cy="50%" innerRadius={35} outerRadius={55} dataKey="value" paddingAngle={3} strokeWidth={0}>
+              <PieChart accessibilityLayer={false}>
+                <Pie data={donutData} cx="50%" cy="50%" innerRadius={35} outerRadius={55} dataKey="value" paddingAngle={3} strokeWidth={0} rootTabIndex={-1}>
                   {donutData.map((_, i) => <Cell key={i} fill={donutColors[i]} />)}
                 </Pie>
                 <Tooltip contentStyle={tooltipStyle} />

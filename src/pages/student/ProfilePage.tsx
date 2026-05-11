@@ -18,11 +18,18 @@ import {
   Save, CheckCircle, Bookmark, Pencil, Phone, UserRound,
   BookOpen, ArrowRight, Camera, Award, Target, Hash, Flame,
 } from 'lucide-react';
-import type { Exam, Bookmark as BookmarkType, Question, Option } from '../../types/database';
+import type { Exam, Bookmark as BookmarkType, Question, Option, TestAttempt } from '../../types/database';
 
 interface BookmarkWithQuestion extends BookmarkType {
   question: Question & { options: Option[] };
 }
+
+type ProfileAttempt = Pick<
+  TestAttempt,
+  'score' | 'correct_answers' | 'total_questions' | 'completed_at' | 'started_at'
+>;
+
+const PROFILE_ATTEMPT_LIMIT = 200;
 
 export default function ProfilePage() {
   const { profile, updateProfile } = useAuthStore();
@@ -62,17 +69,21 @@ export default function ProfilePage() {
         supabase.from('exams').select('*').eq('is_active', true).order('name'),
         supabase.from('bookmarks').select('*, question:questions(*, options(*))', { count: 'exact' })
           .eq('user_id', profile!.id).order('created_at', { ascending: false }).limit(4),
-        supabase.from('test_attempts').select('*')
-          .eq('user_id', profile!.id).eq('status', 'completed'),
+        supabase.from('test_attempts')
+          .select('score, correct_answers, total_questions, completed_at, started_at', { count: 'exact' })
+          .eq('user_id', profile!.id)
+          .eq('status', 'completed')
+          .order('completed_at', { ascending: false })
+          .limit(PROFILE_ATTEMPT_LIMIT),
         profile?.exam_id
-          ? supabase.from('leaderboard_scores').select('*').eq('user_id', profile!.id).eq('exam_id', profile!.exam_id).single()
+          ? supabase.from('leaderboard_scores').select('total_score').eq('user_id', profile!.id).eq('exam_id', profile!.exam_id).single()
           : Promise.resolve({ data: null }),
       ]);
       if (examsRes.data) setExams(examsRes.data);
       if (bmRes.data) setRecentBookmarks(bmRes.data as BookmarkWithQuestion[]);
       if (bmRes.count != null) setBookmarkCount(bmRes.count);
 
-      const attempts = attemptsRes.data || [];
+      const attempts = (attemptsRes.data || []) as ProfileAttempt[];
       const totalCorrect = attempts.reduce((a, b) => a + (b.correct_answers || 0), 0);
       const totalQuestions = attempts.reduce((a, b) => a + (b.total_questions || 0), 0);
       const accuracy = totalQuestions > 0 ? Math.round((totalCorrect / totalQuestions) * 100) : 0;
@@ -88,7 +99,7 @@ export default function ProfilePage() {
         }
       }
 
-      setStats({ rank: 0, points, accuracy, testsCount: attempts.length, streak });
+      setStats({ rank: 0, points, accuracy, testsCount: attemptsRes.count ?? attempts.length, streak });
 
       if (profile?.exam_id && lbRes.data) {
         const { count } = await supabase.from('leaderboard_scores').select('id', { count: 'exact', head: true })
@@ -106,6 +117,12 @@ export default function ProfilePage() {
   }
 
   function openAvatarDialog() { setTempAvatarStyle(avatarStyle); setAvatarDialogOpen(true); }
+
+  function handleActionKey(event: React.KeyboardEvent, action: () => void) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    action();
+  }
 
   async function handleSaveProfile() {
     setSaving(true);
@@ -146,12 +163,12 @@ export default function ProfilePage() {
         <div className="absolute inset-0 bg-gradient-to-br from-[var(--primary)]/15 via-[var(--primary)]/5 to-transparent" />
         <div className="relative p-5 md:p-6">
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
-            <div className="relative group cursor-pointer" onClick={openAvatarDialog}>
+            <button type="button" className="relative group cursor-pointer rounded-full border-0 bg-transparent p-0 focus-ring" onClick={openAvatarDialog} aria-label="Choose avatar">
               <Avatar name={profile.full_name} src={getAvatarUrl(avatarStyle, profile.full_name)} size="lg" className="!h-24 !w-24 ring-4 !ring-[var(--primary)]/20 shadow-lg" />
               <div className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
                 <Camera className="h-5 w-5 text-white" />
               </div>
-            </div>
+            </button>
             <div className="flex-1 text-center sm:text-left space-y-2">
               <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                 <h1 className="text-2xl font-bold text-[var(--fg)]">{profile.full_name}</h1>
@@ -211,7 +228,14 @@ export default function ProfilePage() {
             {recentBookmarks.map((bm) => {
               const q = bm.question;
               return (
-                <Card key={bm.id} className="cursor-pointer group hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--primary)]/30 transition duration-200" onClick={() => setSelectedBookmark(bm)}>
+                <Card
+                  key={bm.id}
+                  className="cursor-pointer group hover:-translate-y-0.5 hover:shadow-md hover:border-[var(--primary)]/30 transition duration-200 focus-ring"
+                  onClick={() => setSelectedBookmark(bm)}
+                  onKeyDown={(event) => handleActionKey(event, () => setSelectedBookmark(bm))}
+                  role="button"
+                  tabIndex={0}
+                >
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Badge variant={q?.difficulty === 'easy' ? 'success' : q?.difficulty === 'hard' ? 'danger' : 'warning'} className="text-[10px]">{q?.difficulty}</Badge>

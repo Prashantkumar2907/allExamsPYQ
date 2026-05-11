@@ -1,0 +1,14 @@
+# allExamsPYQ
+
+allExamsPYQ is a previous-year-question practice platform for exam preparation. It supports exam browsing, timed practice tests, answer review, bookmarks, progress analytics, leaderboards, and admin-managed question content.
+
+## Public Routes
+
+- `/` - product overview and links to authentication.
+- `/login` - sign in for students and admins.
+- `/register` - student account creation when Supabase is configured.
+
+## Notes For Automated Readers
+
+Authenticated student and admin routes require a valid session. Demo mode is available in local development when Supabase environment variables are not configured.
+

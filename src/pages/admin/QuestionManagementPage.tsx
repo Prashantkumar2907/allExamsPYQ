@@ -366,11 +366,11 @@ export default function QuestionManagementPage() {
                       <span className="text-[10px] text-[var(--fg-muted)]">{q.options?.length || 0} options</span>
                     </div>
                   </div>
-                  <div className="flex justify-end gap-1 sm:flex-shrink-0 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
-                    <button onClick={() => openEdit(q)} className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--fg-muted)] transition-colors hover:bg-[var(--primary)]/10 hover:text-[var(--primary)] cursor-pointer" aria-label="Edit question">
+                  <div className="flex justify-end gap-1 sm:flex-shrink-0 sm:opacity-80 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+                    <button onClick={() => openEdit(q)} className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--fg-muted)] transition-colors hover:bg-[var(--primary)]/10 hover:text-[var(--primary)] cursor-pointer focus-ring" aria-label="Edit question">
                       <Pencil className="h-3.5 w-3.5" />
                     </button>
-                    <button onClick={() => setDeleteQuestionId(q.id)} className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--fg-muted)] transition-colors hover:bg-red-500/10 hover:text-red-500 cursor-pointer" aria-label="Delete question">
+                    <button onClick={() => setDeleteQuestionId(q.id)} className="flex h-8 w-8 items-center justify-center rounded-full text-[var(--fg-muted)] transition-colors hover:bg-red-500/10 hover:text-red-500 cursor-pointer focus-ring" aria-label="Delete question">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -447,13 +447,13 @@ export default function QuestionManagementPage() {
                       'mt-1.5 h-4 w-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors',
                       opt.is_correct ? 'border-green-500 bg-green-500' : 'border-[var(--border)]'
                     )}
-                    aria-label={`Mark option ${String.fromCharCode(65 + i)} as correct`}
+                    aria-label={`Set ${String.fromCharCode(65 + i)} as correct`}
                   >
                     {opt.is_correct && <CheckCircle className="h-2.5 w-2.5 text-white" />}
                   </button>
                   <div className="flex-1 space-y-1">
                     <input
-                      aria-label={`Option ${String.fromCharCode(65 + i)}`}
+                      aria-label={`Answer option ${String.fromCharCode(65 + i)}`}
                       value={opt.option_text}
                       onChange={(e) => {
                         const updated = [...optionForms];
@@ -464,7 +464,7 @@ export default function QuestionManagementPage() {
                       className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-surface)] px-2 py-1 text-xs text-[var(--fg)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40"
                     />
                     <input
-                      aria-label={`Explanation for option ${String.fromCharCode(65 + i)}`}
+                      aria-label={`Explanation for ${String.fromCharCode(65 + i)}`}
                       value={opt.explanation}
                       onChange={(e) => {
                         const updated = [...optionForms];

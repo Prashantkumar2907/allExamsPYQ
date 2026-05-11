@@ -18,7 +18,7 @@ interface UploadResult {
   errors: string[];
 }
 
-const QUESTION_TYPES = new Set<QuestionType>(['single_choice', 'multiple_choice', 'numerical']);
+const QUESTION_TYPES = new Set<QuestionType>(['single_choice']);
 const DIFFICULTIES = new Set<Difficulty>(['easy', 'medium', 'hard']);
 const OPTION_KEYS = ['a', 'b', 'c', 'd'];
 
@@ -178,7 +178,7 @@ const sampleRow = ['JEE Main', 'Physics', 'Mechanics', 'Newton Laws', 'What is N
             continue;
           }
           if (!isQuestionType(questionType)) {
-            errors.push(`Row ${i + 2}: Invalid question_type`);
+            errors.push(`Row ${i + 2}: question_type must be single_choice`);
             continue;
           }
           if (!isDifficulty(difficulty)) {
@@ -301,7 +301,7 @@ const sampleRow = ['JEE Main', 'Physics', 'Mechanics', 'Newton Laws', 'What is N
               {uploading ? 'Uploading...' : 'Drop CSV file here or click to browse'}
             </p>
             <p className="text-xs text-[var(--fg-muted)] mt-1">
-              Supports CSV files with exam, subject, chapter, topic, and question columns
+              Supports single-choice CSV rows with exam, subject, chapter, topic, and question columns
             </p>
           </div>
           {!uploading && (

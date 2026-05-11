@@ -6,7 +6,9 @@ type Filter =
   | { type: 'eq'; column: string; value: unknown }
   | { type: 'in'; column: string; values: unknown[] }
   | { type: 'not'; column: string; operator: string; value: unknown }
-  | { type: 'gt' | 'gte' | 'lt' | 'lte'; column: string; value: unknown };
+  | { type: 'gt' | 'gte' | 'lt' | 'lte'; column: string; value: unknown }
+  | { type: 'ilike'; column: string; value: string }
+  | { type: 'or'; filters: Filter[] };
 
 type QueryResult<T = unknown> = {
   data: T | null;
@@ -71,7 +73,8 @@ function compareValues(left: unknown, right: unknown) {
   return Number(left) - Number(right);
 }
 
-function matchesFilter(row: DemoRow, filter: Filter, state: DemoState) {
+function matchesFilter(row: DemoRow, filter: Filter, state: DemoState): boolean {
+  if (filter.type === 'or') return filter.filters.some((item) => matchesFilter(row, item, state));
   const value = getValue(row, filter.column, state);
   if (filter.type === 'eq') return value === filter.value;
   if (filter.type === 'in') return filter.values.includes(value);
@@ -79,6 +82,10 @@ function matchesFilter(row: DemoRow, filter: Filter, state: DemoState) {
   if (filter.type === 'gte') return compareValues(value, filter.value) >= 0;
   if (filter.type === 'lt') return compareValues(value, filter.value) < 0;
   if (filter.type === 'lte') return compareValues(value, filter.value) <= 0;
+  if (filter.type === 'ilike') {
+    const needle = filter.value.replace(/%/g, '').toLowerCase();
+    return String(value ?? '').toLowerCase().includes(needle);
+  }
   if (filter.type === 'not' && filter.operator === 'is' && filter.value === null) return value !== null;
   return true;
 }
@@ -280,6 +287,26 @@ class DemoQuery {
 
   in(column: string, values: unknown[]) {
     this.filters.push({ type: 'in', column, values });
+    return this;
+  }
+
+  ilike(column: string, value: string) {
+    this.filters.push({ type: 'ilike', column, value });
+    return this;
+  }
+
+  or(expression: string) {
+    const filters = expression
+      .split(',')
+      .map((condition) => {
+        const [column, operator, ...rest] = condition.split('.');
+        const value = rest.join('.');
+        return operator === 'ilike' && column && value
+          ? ({ type: 'ilike', column, value } as Filter)
+          : null;
+      })
+      .filter((filter): filter is Filter => Boolean(filter));
+    if (filters.length > 0) this.filters.push({ type: 'or', filters });
     return this;
   }
 

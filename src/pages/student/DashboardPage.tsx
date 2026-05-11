@@ -35,6 +35,8 @@ type DashboardAttempt = Pick<
   | 'started_at'
 >;
 
+const DASHBOARD_ATTEMPT_LIMIT = 100;
+
 const StudentTrendChart = lazy(() =>
   import('../../components/charts/DashboardCharts').then((module) => ({ default: module.StudentTrendChart }))
 );
@@ -53,6 +55,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [attempts, setAttempts] = useState<DashboardAttempt[]>([]);
+  const [totalTests, setTotalTests] = useState(0);
   const [syllabusProgress, setSyllabusProgress] = useState<SyllabusProgress[]>([]);
   const [totalTopics, setTotalTopics] = useState(0);
   const [nextTest, setNextTest] = useState<{ title: string; scheduled_at: string } | null>(null);
@@ -67,13 +70,19 @@ export default function DashboardPage() {
     setLoading(true);
     setError('');
     try {
-    const [attRes, sylRes, topRes, testRes] = await Promise.all([
+    const [attRes, attCountRes, sylRes, topRes, testRes] = await Promise.all([
       supabase
         .from('test_attempts')
         .select('id, source_name, score, total_marks, correct_answers, wrong_answers, skipped, total_questions, completed_at, started_at')
         .eq('user_id', profile!.id)
         .eq('status', 'completed')
-        .order('completed_at', { ascending: false }),
+        .order('completed_at', { ascending: false })
+        .limit(DASHBOARD_ATTEMPT_LIMIT),
+      supabase
+        .from('test_attempts')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', profile!.id)
+        .eq('status', 'completed'),
       supabase
         .from('syllabus_progress')
         .select('topic_id, is_completed')
@@ -92,11 +101,13 @@ export default function DashboardPage() {
     ]);
 
     if (attRes.error) throw attRes.error;
+    if (attCountRes.error) throw attCountRes.error;
     if (sylRes.error) throw sylRes.error;
     if ('error' in topRes && topRes.error) throw topRes.error;
     if (testRes.error) throw testRes.error;
 
     if (attRes.data) setAttempts(attRes.data);
+    setTotalTests(attCountRes.count ?? attRes.data?.length ?? 0);
     if (sylRes.data) setSyllabusProgress(sylRes.data as SyllabusProgress[]);
     setTotalTopics(Number(topRes.data ?? 0));
     if (testRes.data?.[0]) setNextTest(testRes.data[0] as { title: string; scheduled_at: string });
@@ -106,6 +117,13 @@ export default function DashboardPage() {
       setLoading(false);
     }
   }
+
+  function handleActionKey(event: React.KeyboardEvent, action: () => void) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault();
+    action();
+  }
+
   if (error) return <ErrorState description={error} onRetry={loadData} />;
 
   if (loading) {
@@ -123,13 +141,13 @@ export default function DashboardPage() {
     );
   }
 
-  const totalTests = attempts.length;
-  const avgScore = totalTests
-    ? Math.round(attempts.reduce((a, b) => a + getScorePercentage(b.score, b.total_marks), 0) / totalTests)
+  const scoredAttempts = attempts.length;
+  const avgScore = scoredAttempts
+    ? Math.round(attempts.reduce((a, b) => a + getScorePercentage(b.score, b.total_marks), 0) / scoredAttempts)
     : 0;
-  const avgAccuracy = totalTests
+  const avgAccuracy = scoredAttempts
     ? Math.round(
-        attempts.reduce((a, b) => a + getAccuracy(b.correct_answers, b.total_questions), 0) / totalTests
+        attempts.reduce((a, b) => a + getAccuracy(b.correct_answers, b.total_questions), 0) / scoredAttempts
       )
     : 0;
   const completedTopics = syllabusProgress.filter((s) => s.is_completed).length;
@@ -266,8 +284,11 @@ export default function DashboardPage() {
               return (
                 <div
                   key={a.id}
-                  className="flex items-center gap-3 px-3.5 py-2.5 hover:bg-[var(--bg-surface-hover)] cursor-pointer transition-colors"
+                  className="flex items-center gap-3 px-3.5 py-2.5 hover:bg-[var(--bg-surface-hover)] cursor-pointer transition-colors focus-ring"
                   onClick={() => navigate(`/result/${a.id}`)}
+                  onKeyDown={(event) => handleActionKey(event, () => navigate(`/result/${a.id}`))}
+                  role="button"
+                  tabIndex={0}
                 >
                   <div className={cn(
                     'h-9 w-9 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0',
@@ -292,7 +313,7 @@ export default function DashboardPage() {
         <p className="text-xs font-semibold text-[var(--fg-muted)] uppercase tracking-wider mb-3">Quick Actions</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {nextTest && (
-            <Card className="group cursor-pointer hover:translate-y-[-2px] hover:shadow-lg transition duration-200">
+            <Card>
               <div className="flex items-center gap-3.5">
                 <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-500/5 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
                   <Clock className="h-5 w-5 text-amber-500" />
@@ -305,8 +326,11 @@ export default function DashboardPage() {
             </Card>
           )}
           <Card
-            className="group cursor-pointer hover:translate-y-[-2px] hover:shadow-lg transition duration-200"
+            className="group cursor-pointer hover:translate-y-[-2px] hover:shadow-lg transition duration-200 focus-ring"
             onClick={() => navigate('/exams')}
+            onKeyDown={(event) => handleActionKey(event, () => navigate('/exams'))}
+            role="button"
+            tabIndex={0}
           >
             <div className="flex items-center gap-3.5">
               <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-[var(--primary)]/20 to-[var(--primary)]/5 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
@@ -320,8 +344,11 @@ export default function DashboardPage() {
             </div>
           </Card>
           <Card
-            className="group cursor-pointer hover:translate-y-[-2px] hover:shadow-lg transition duration-200"
+            className="group cursor-pointer hover:translate-y-[-2px] hover:shadow-lg transition duration-200 focus-ring"
             onClick={() => navigate('/tests')}
+            onKeyDown={(event) => handleActionKey(event, () => navigate('/tests'))}
+            role="button"
+            tabIndex={0}
           >
             <div className="flex items-center gap-3.5">
               <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-[var(--primary)]/20 to-[var(--primary)]/5 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">

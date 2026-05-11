@@ -44,6 +44,7 @@ export default function TestTakingPage() {
   const attemptRef = useRef<TestAttempt | null>(null);
   const questionsRef = useRef<Question[]>([]);
   const answersRef = useRef<Record<string, string | null>>({});
+  const pendingAnswerSavesRef = useRef<Set<Promise<void>>>(new Set());
   const submittingRef = useRef(false);
   const allowNavigationRef = useRef(false);
   const blocker = useBlocker(({ currentLocation, nextLocation }) =>
@@ -159,7 +160,15 @@ export default function TestTakingPage() {
     }
   }
 
+  function trackAnswerSave(savePromise: PromiseLike<void>) {
+    const trackedSave = Promise.resolve(savePromise);
+    pendingAnswerSavesRef.current.add(trackedSave);
+    void trackedSave.finally(() => pendingAnswerSavesRef.current.delete(trackedSave));
+    return trackedSave;
+  }
+
   const selectAnswer = useCallback(async (questionId: string, optionId: string) => {
+    if (submittingRef.current) return;
     setAnswers((prev) => {
       const next = { ...prev, [questionId]: optionId };
       answersRef.current = next;
@@ -167,15 +176,19 @@ export default function TestTakingPage() {
     });
     const question = questions.find((q) => q.id === questionId);
     const option = question?.options?.find((o) => o.id === optionId);
-    const { error: saveError } = await supabase
-      .from('user_answers')
-      .update({
-        selected_option_id: optionId,
-        is_correct: option?.is_correct ?? null,
-      })
-      .eq('attempt_id', attemptId!)
-      .eq('question_id', questionId);
-    if (saveError) toast.error(getErrorMessage(saveError, 'Could not save that answer.'));
+    await trackAnswerSave(
+      supabase
+        .from('user_answers')
+        .update({
+          selected_option_id: optionId,
+          is_correct: option?.is_correct ?? null,
+        })
+        .eq('attempt_id', attemptId!)
+        .eq('question_id', questionId)
+        .then(({ error: saveError }) => {
+          if (saveError) toast.error(getErrorMessage(saveError, 'Could not save that answer.'));
+        })
+    );
   }, [questions, attemptId]);
 
   function requestSubmit() {
@@ -202,6 +215,10 @@ export default function TestTakingPage() {
         throw new Error('This attempt has no questions to submit.');
       }
 
+      if (pendingAnswerSavesRef.current.size > 0) {
+        await Promise.allSettled([...pendingAnswerSavesRef.current]);
+      }
+
       let correct = 0;
       let wrong = 0;
       let skipped = 0;
@@ -226,6 +243,22 @@ export default function TestTakingPage() {
       const finalScore = Math.max(0, score);
       const startedAt = latestAttempt?.started_at ? new Date(latestAttempt.started_at).getTime() : Date.now();
       const timeTaken = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+      const answerSyncResults = await Promise.all(
+        latestQuestions.map((q) => {
+          const selectedId = latestAnswers[q.id] ?? null;
+          const option = selectedId ? q.options?.find((o) => o.id === selectedId) : null;
+          return supabase
+            .from('user_answers')
+            .update({
+              selected_option_id: selectedId,
+              is_correct: selectedId ? option?.is_correct ?? null : null,
+            })
+            .eq('attempt_id', attemptId!)
+            .eq('question_id', q.id);
+        })
+      );
+      const answerSyncError = answerSyncResults.find((result) => result.error)?.error;
+      if (answerSyncError) throw answerSyncError;
 
       const { error: submitError } = await supabase
         .from('test_attempts')
@@ -364,9 +397,10 @@ export default function TestTakingPage() {
                   .map((opt, oi) => (
                     <button
                       key={opt.id}
-                      onClick={() => selectAnswer(question.id, opt.id)}
+                      onClick={() => void selectAnswer(question.id, opt.id)}
+                      disabled={submitting}
                       className={cn(
-                        'w-full flex items-center gap-3 p-3 rounded-xl border text-left text-sm transition duration-150 cursor-pointer',
+                        'w-full flex items-center gap-3 p-3 rounded-xl border text-left text-sm transition duration-150 cursor-pointer disabled:cursor-not-allowed disabled:opacity-70',
                         answers[question.id] === opt.id
                           ? 'border-[var(--primary)] bg-[var(--primary)]/8 text-[var(--fg)] shadow-sm'
                           : 'border-[var(--border)] bg-[var(--bg-surface)] text-[var(--fg)] hover:border-[var(--primary)]/30 hover:bg-[var(--primary)]/3'
